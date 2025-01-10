@@ -2,6 +2,11 @@
 /dist
 /node_modules
 /build
+/mongo
+mongo/
+mongo
+.env
+
 
 # Logs
 logs
