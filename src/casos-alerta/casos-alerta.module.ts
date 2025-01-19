@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { CasosAlertaService } from './casos-alerta.service';
 import { CasosAlertaController } from './casos-alerta.controller';
-import { MulterModule } from '@nestjs/platform-express';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CasosAlerta, CasosAlertaSchema } from './entities/casos-alerta.entity';
+import { GoogleApiService } from 'src/google-api/google-api.service';
 
 @Module({
   controllers: [CasosAlertaController],
-  providers: [CasosAlertaService],
+  providers: [CasosAlertaService, GoogleApiService],
   imports:[
-    MulterModule.register({
-      dest: './uploads'
-    }),
+    MongooseModule.forFeature([
+      {name: CasosAlerta.name, schema: CasosAlertaSchema}
+    ]),
   ],
 })
 export class CasosAlertaModule {

@@ -1,31 +1,46 @@
-import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, Matches, IsEmpty, IsArray, ArrayNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateCasosAlertaDto {
 
     @IsString()
     @IsNotEmpty()
+    @Matches(/^DEIC52-\d{4}-\d{2}-\d{2}-\d+$/, {
+        message: 'El numero Deic debe seguir el formato DEIC52-AAAA-MM-DD-XXX'
+    })
     numeroDeic: string;
 
-    @IsString()
-    @IsNotEmpty()
-    numeroMp: string;
 
     @IsString()
     @IsNotEmpty()
+    @Matches(/^M0030-\d{4}-\d+$/,{
+        message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX-'
+    })
+    numeroMp: string;
+
+
+    @IsString()
+    @IsNotEmpty()
+    @Matches(/^\d+-\d{4}$/, {
+        message: 'El numero de alerta, debe seguir el formato XXXX-AAAA'
+    } )
     numeroAlerta: string;
+
 
     @IsString()
     @IsNotEmpty()
     nombreDesaparecido: string;
 
+
     @IsDate()
     @Type(() => Date)
     fecha_Nac: Date;
 
+
     @IsString()
     @IsNotEmpty()
     estadoInvestigacion: string;
+
 
     @IsObject()
     direccion: {
@@ -36,6 +51,6 @@ export class CreateCasosAlertaDto {
 
     @IsOptional()
     @IsString()
-    fileUrls: string; // Aquí almacenaremos la URL del archivo en Google Drive
+    fileUrls: string;
 
 }

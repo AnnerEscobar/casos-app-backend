@@ -15,5 +15,8 @@ import { memoryStorage } from 'multer';
       storage: memoryStorage(), // Configuración para almacenar archivos en la memoria
     }),
   ],
+  exports:[
+    GoogleApiService
+  ]
 })
 export class GoogleApiModule {}
