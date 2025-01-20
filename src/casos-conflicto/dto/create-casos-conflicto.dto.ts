@@ -1,1 +1,9 @@
-export class CreateCasosConflictoDto {}
+export class CreateCasosConflictoDto {
+
+
+
+
+
+
+
+}
