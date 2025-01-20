@@ -5,24 +5,34 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CasosAlerta } from './entities/casos-alerta.entity';
 import { Model } from 'mongoose';
 import { GoogleApiService } from 'src/google-api/google-api.service';
+import { extname } from 'path';
 
 @Injectable()
 export class CasosAlertaService {
 
-
+ //constructor
   constructor(
     @InjectModel(CasosAlerta.name) private readonly casosAlertaModel: Model<CasosAlerta>,
     private readonly googleApiService: GoogleApiService
   ) { }
 
+
   //Metodo para crear un caso
   async create(createCasosAlertaDto: CreateCasosAlertaDto, file: Express.Multer.File): Promise<CasosAlerta> {
 
     try {
+
       let fileUrl = null;
 
       if (file) {
-        fileUrl = await this.googleApiService.uploadFile(file);
+        const newFileName = `${createCasosAlertaDto.numeroDeic}${extname(file.originalname)}`;
+
+        const renamedFile = {
+          ...file,
+          originalname: newFileName,
+        }
+
+        fileUrl = await this.googleApiService.uploadFile(renamedFile);
       }
 
       const newCaso = new this.casosAlertaModel({
@@ -32,11 +42,8 @@ export class CasosAlertaService {
 
       return newCaso.save()
     } catch (error) {
-
       throw new BadRequestException(`Error al crear el caso, ${error}`)
-
     }
-
   }
 
 
