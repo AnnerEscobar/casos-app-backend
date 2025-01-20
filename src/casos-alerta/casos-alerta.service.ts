@@ -21,9 +21,12 @@ export class CasosAlertaService {
   async create(createCasosAlertaDto: CreateCasosAlertaDto, file: Express.Multer.File): Promise<CasosAlerta> {
 
     try {
+      const existingCaso = await this.casosAlertaModel.findOne({numeroDeic: createCasosAlertaDto.numeroDeic});
+      if (existingCaso) {
+        throw new BadRequestException('El caso con este número DEIC ya está registrado. No se guardará el archivo.');
+      }
 
       let fileUrl = null;
-
       if (file) {
         const newFileName = `${createCasosAlertaDto.numeroDeic}${extname(file.originalname)}`;
 
