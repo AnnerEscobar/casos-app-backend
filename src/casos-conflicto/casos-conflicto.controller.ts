@@ -3,12 +3,12 @@ import { CasosConflictoService } from './casos-conflicto.service';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
 
-@Controller('casos-conflicto')
+@Controller('conflictos')
 export class CasosConflictoController {
 
   constructor(private readonly casosConflictoService: CasosConflictoService) {}
 
-  @Post('create')
+  @Post('crear-conflicto')
 async create(@Body() createCasosConflictoDto: CreateCasosConflictoDto) {
   try {
     const nuevoCaso = await this.casosConflictoService.create(createCasosConflictoDto);
