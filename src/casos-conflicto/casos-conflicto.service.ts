@@ -1,13 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
+import { InjectModel } from '@nestjs/mongoose';
+import { CasosConflicto, CasosConflictoDocument } from './entities/casos-conflicto.entity';
+import { Model } from 'mongoose';
 
 @Injectable()
 export class CasosConflictoService {
-  create(createCasosConflictoDto: CreateCasosConflictoDto) {
-    return 'This action adds a new casosConflicto';
+
+  constructor(
+    @InjectModel(CasosConflicto.name) private readonly casoModel: Model<CasosConflictoDocument>,
+  ) {}
+
+  async create(createCasosConflictoDto: CreateCasosConflictoDto): Promise<CasosConflicto> {
+    const nuevoCaso = new this.casoModel(createCasosConflictoDto);
+    return nuevoCaso.save();
   }
 
+
+
+  //metodos sin implementar
   findAll() {
     return `This action returns all casosConflicto`;
   }

@@ -20,6 +20,8 @@ export class CasosAlertaController {
   }
 
 
+
+  //metodos no utilizados
   @Get()
   findAll() {
     return this.casosAlertaService.findAll();

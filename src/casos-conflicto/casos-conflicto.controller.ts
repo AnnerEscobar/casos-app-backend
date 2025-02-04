@@ -1,16 +1,35 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, HttpException } from '@nestjs/common';
 import { CasosConflictoService } from './casos-conflicto.service';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
 
 @Controller('casos-conflicto')
 export class CasosConflictoController {
+
   constructor(private readonly casosConflictoService: CasosConflictoService) {}
 
-  @Post()
-  create(@Body() createCasosConflictoDto: CreateCasosConflictoDto) {
-    return this.casosConflictoService.create(createCasosConflictoDto);
+  @Post('create')
+async create(@Body() createCasosConflictoDto: CreateCasosConflictoDto) {
+  try {
+    const nuevoCaso = await this.casosConflictoService.create(createCasosConflictoDto);
+    return {
+      success: true,
+      message: 'Caso registrado exitosamente',
+      data: nuevoCaso,
+    };
+  } catch (error) {
+    console.error('Error al registrar el caso:', error.message);
+    throw new HttpException(
+      {
+        success: false,
+        message: 'Error al registrar el caso',
+        error: error.message,
+      },
+      HttpStatus.BAD_REQUEST,
+    );
   }
+}
+
 
   @Get()
   findAll() {
