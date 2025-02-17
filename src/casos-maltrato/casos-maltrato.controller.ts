@@ -1,16 +1,33 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CasosMaltratoService } from './casos-maltrato.service';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
-@Controller('casos-maltrato')
+@Controller('maltratos')
 export class CasosMaltratoController {
-  constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
+  constructor(private readonly casosMaltratoService: CasosMaltratoService) { }
 
-  @Post()
-  create(@Body() createCasosMaltratoDto: CreateCasosMaltratoDto) {
-    return this.casosMaltratoService.create(createCasosMaltratoDto);
+  @Post('crear-maltrato')
+  @UseInterceptors(FileInterceptor('file')) // 📌 Maneja la subida de un solo archivo
+  async create(
+    @Body() createCasosConflictoDto: CreateCasosMaltratoDto,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.casosMaltratoService.create(createCasosConflictoDto, file);
   }
+
+
+
+
+
+
+
+
+
+
+
+  //casos sin implemententar
 
   @Get()
   findAll() {

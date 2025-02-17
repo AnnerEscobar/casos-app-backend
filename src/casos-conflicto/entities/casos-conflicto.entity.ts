@@ -6,7 +6,9 @@ export type CasosConflictoDocument = CasosConflicto & Document;
 
 // Subdocumento para infractores y víctimas
 @Schema({ _id: false }) // No genera un _id independiente para cada subdocumento
+
 export class VictimaInfractor {
+
   @Prop({ required: true })
   nombre: string;
 
@@ -22,10 +24,10 @@ export class VictimaInfractor {
 
 // Esquema principal
 @Schema({ timestamps: true }) // Agrega createdAt y updatedAt automáticamente
-export class CasosConflicto {
+export class CasosConflicto  extends Document {
   @Prop({
     required: true,
-    match: /^DEIC52-\d{4}-\d{2}-\d{2}-\d+$/,
+    match: /^DEIC53-\d{4}-\d{2}-\d{2}-\d+$/,
   })
   numeroDeic: string;
 

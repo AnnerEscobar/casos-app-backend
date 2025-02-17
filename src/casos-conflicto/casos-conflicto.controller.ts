@@ -1,34 +1,22 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, HttpException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CasosConflictoService } from './casos-conflicto.service';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('conflictos')
 export class CasosConflictoController {
 
-  constructor(private readonly casosConflictoService: CasosConflictoService) {}
+  constructor(private readonly casosConflictoService: CasosConflictoService) { }
 
   @Post('crear-conflicto')
-async create(@Body() createCasosConflictoDto: CreateCasosConflictoDto) {
-  try {
-    const nuevoCaso = await this.casosConflictoService.create(createCasosConflictoDto);
-    return {
-      success: true,
-      message: 'Caso registrado exitosamente',
-      data: nuevoCaso,
-    };
-  } catch (error) {
-    console.error('Error al registrar el caso:', error.message);
-    throw new HttpException(
-      {
-        success: false,
-        message: 'Error al registrar el caso',
-        error: error.message,
-      },
-      HttpStatus.BAD_REQUEST,
-    );
+  @UseInterceptors(FileInterceptor('file')) // 📌 Maneja la subida de un solo archivo
+  async create(
+    @Body() createCasosConflictoDto: CreateCasosConflictoDto,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.casosConflictoService.create(createCasosConflictoDto, file);
   }
-}
 
 
   @Get()

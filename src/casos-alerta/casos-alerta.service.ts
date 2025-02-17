@@ -10,7 +10,6 @@ import { extname } from 'path';
 @Injectable()
 export class CasosAlertaService {
 
- //constructor
   constructor(
     @InjectModel(CasosAlerta.name) private readonly casosAlertaModel: Model<CasosAlerta>,
     private readonly googleApiService: GoogleApiService
