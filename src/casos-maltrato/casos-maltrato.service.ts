@@ -11,23 +11,24 @@ import { extname } from 'path';
 export class CasosMaltratoService {
 
   constructor(
-    @InjectModel(CasosMaltrato.name) private readonly casoModel: Model<CasosMaltratoDocument>,
+    @InjectModel(CasosMaltrato.name) 
+    private readonly casoModel: Model<CasosMaltratoDocument>,
     private googleApiService: GoogleApiService
   ) { }
 
-  async create(createCasosConflictoDto: CreateCasosMaltratoDto, file: Express.Multer.File): Promise<CasosMaltrato> {
+
+  async create(CreateCasosMaltratoDto: CreateCasosMaltratoDto, file: Express.Multer.File): Promise<CasosMaltrato> {
     try {
       // 📌 1️⃣ Verificar si el caso ya existe
-      const existingCaso = await this.casoModel.findOne({ numeroDeic: createCasosConflictoDto.numeroDeic });
+      const existingCaso = await this.casoModel.findOne({ numeroDeic: CreateCasosMaltratoDto.numeroDeic });
       if (existingCaso) {
         throw new BadRequestException('El caso con este número DEIC ya está registrado. No se guardará el archivo.');
       }
 
       let fileUrl = null;
-
-      // 📌 2️⃣ Subir el archivo si existe
+    
       if (file) {
-        const newFileName = `${createCasosConflictoDto.numeroDeic}${extname(file.originalname)}`;
+        const newFileName = `${CreateCasosMaltratoDto.numeroDeic}${extname(file.originalname)}`;
 
         const renamedFile = {
           ...file,
@@ -37,9 +38,8 @@ export class CasosMaltratoService {
         fileUrl = await this.googleApiService.uploadFile(renamedFile);
       }
 
-      // 📌 3️⃣ Crear el nuevo caso con la URL del archivo
       const newCaso = new this.casoModel({
-        ...createCasosConflictoDto,
+        ...CreateCasosMaltratoDto,
         fileUrls: fileUrl ? [fileUrl] : [],
       });
 
@@ -51,12 +51,18 @@ export class CasosMaltratoService {
     }
   }
 
+  async findAll():Promise<CasosMaltratoDocument[]> {
+    try{
+      const maltratos = await this.casoModel.find().exec();
+      return maltratos;
+    }catch(error){
+      throw new Error(`Error al obtener los casos de conflicto, ${error.message}`)
+    }
 
-
-  findAll() {
-    return `This action returns all casosMaltrato`;
   }
 
+
+  //no implementados
   findOne(id: number) {
     return `This action returns a #${id} casosMaltrato`;
   }

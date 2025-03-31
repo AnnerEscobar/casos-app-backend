@@ -11,7 +11,8 @@ import { extname } from 'path';
 export class CasosConflictoService {
 
   constructor(
-    @InjectModel(CasosConflicto.name) private readonly casoModel: Model<CasosConflictoDocument>,
+    @InjectModel(CasosConflicto.name) 
+    private readonly casoModel: Model<CasosConflictoDocument>,
     private googleApiService: GoogleApiService
   ) {}
 
@@ -49,12 +50,18 @@ export class CasosConflictoService {
     }
   }
 
+  async findAll(): Promise<CasosConflictoDocument[]> {
+    try{
+      const conflictos = await this.casoModel.find();
+      return conflictos;
+    }catch(error){
+      throw new BadRequestException(`Error al obtener los maltratos, ${error}`);
+    }
+    
+  }
 
 
   //metodos sin implementar
-  findAll() {
-    return `This action returns all casosConflicto`;
-  }
 
   findOne(id: number) {
     return `This action returns a #${id} casosConflicto`;

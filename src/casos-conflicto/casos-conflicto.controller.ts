@@ -3,6 +3,7 @@ import { CasosConflictoService } from './casos-conflicto.service';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
 import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { CasosConflictoDocument } from './entities/casos-conflicto.entity';
 
 @Controller('conflictos')
 export class CasosConflictoController {
@@ -20,7 +21,7 @@ export class CasosConflictoController {
 
 
   @Get()
-  findAll() {
+  async findAll(): Promise<CasosConflictoDocument[]> {
     return this.casosConflictoService.findAll();
   }
 

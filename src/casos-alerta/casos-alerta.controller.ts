@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, Query, NotFoundException } from '@nestjs/common';
 import { CasosAlertaService } from './casos-alerta.service';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CasosAlerta } from './entities/casos-alerta.entity';
 
 @Controller('alertas')
 export class CasosAlertaController {
@@ -19,13 +20,22 @@ export class CasosAlertaController {
     return this.casosAlertaService.create(createCasosAlertaDto, file)
   }
 
+  @Get()
+  async findAll(): Promise<CasosAlerta[]> {
+    return this.casosAlertaService.findAll();
+  }
+
+    // Buscar alertas por número de expediente MP
+    @Get('por-expedienteMP')
+    async buscarPorNumeroMp(@Query('numeroMp') numeroMp: string): Promise<CasosAlerta[]> {
+      if (!numeroMp) {
+        throw new NotFoundException('El número de expediente MP es requerido.');
+      }
+      return this.casosAlertaService.buscarPorNumeroMp(numeroMp);
+    }
 
 
   //metodos no utilizados
-  @Get()
-  findAll() {
-    return this.casosAlertaService.findAll();
-  }
 
   @Get(':id')
   findOne(@Param('id') id: string) {

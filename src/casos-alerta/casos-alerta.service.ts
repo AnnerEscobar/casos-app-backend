@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,7 +11,8 @@ import { extname } from 'path';
 export class CasosAlertaService {
 
   constructor(
-    @InjectModel(CasosAlerta.name) private readonly casosAlertaModel: Model<CasosAlerta>,
+    @InjectModel(CasosAlerta.name)
+    private readonly casosAlertaModel: Model<CasosAlerta>,
     private readonly googleApiService: GoogleApiService
   ) { }
 
@@ -20,7 +21,7 @@ export class CasosAlertaService {
   async create(createCasosAlertaDto: CreateCasosAlertaDto, file: Express.Multer.File): Promise<CasosAlerta> {
 
     try {
-      const existingCaso = await this.casosAlertaModel.findOne({numeroDeic: createCasosAlertaDto.numeroDeic});
+      const existingCaso = await this.casosAlertaModel.findOne({ numeroDeic: createCasosAlertaDto.numeroDeic });
       if (existingCaso) {
         throw new BadRequestException('El caso con este número DEIC ya está registrado. No se guardará el archivo.');
       }
@@ -34,7 +35,18 @@ export class CasosAlertaService {
           originalname: newFileName,
         }
 
-        fileUrl = await this.googleApiService.uploadFile(renamedFile);
+        const fileId = await this.googleApiService.uploadFile(renamedFile);
+        // Extraer el ID del archivo de la URL de la vista previa
+      const fileIdRegex = /id=([^&]+)/;
+      const match = fileId.match(fileIdRegex);
+      const extractedFileId = match ? match[1] : null;
+
+      if (!extractedFileId) {
+        throw new BadRequestException('No se pudo extraer el ID del archivo de Google Drive.');
+      }
+
+      // Generar el enlace de descarga directa
+      fileUrl = `https://drive.google.com/uc?export=download&id=${extractedFileId}`;
       }
 
       const newCaso = new this.casosAlertaModel({
@@ -48,12 +60,32 @@ export class CasosAlertaService {
     }
   }
 
-
   //cruds creados por el nestjsd
-  findAll() {
-    return `This action returns all casosAlerta`;
+  async findAll(): Promise<CasosAlerta[]> {
+    try {
+      const alertas = await this.casosAlertaModel.find().exec();
+      return alertas;
+    } catch (error) {
+      throw new Error(`Error al obtener los casos de alerta, ${error.message}`)
+    }
   }
 
+  // Método para buscar alertas por número de expediente MP
+  async buscarPorNumeroMp(numeroMp: string): Promise<CasosAlerta[]> {
+    try {
+      const alertas = await this.casosAlertaModel.find({ numeroMp }).exec();
+      if (alertas.length === 0) {
+        throw new NotFoundException('No se encontraron alertas con el número de expediente MP proporcionado.');
+      }
+      return alertas;
+    } catch (error) {
+      throw new BadRequestException(`Error al buscar alertas por número MP: ${error.message}`);
+    }
+  }
+
+
+  //metodos no usados
+  
   findOne(id: number) {
     return `This action returns a #${id} casosAlerta`;
   }

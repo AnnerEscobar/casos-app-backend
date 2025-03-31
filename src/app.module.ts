@@ -6,6 +6,7 @@ import { GoogleApiModule } from './google-api/google-api.module';
 import { CasosMaltratoModule } from './casos-maltrato/casos-maltrato.module';
 import { CasosConflictoModule } from './casos-conflicto/casos-conflicto.module';
 import { ProcedimientosModule } from './procedimientos/procedimientos.module';
+import { BusquedasModule } from './busquedas/busquedas.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { ProcedimientosModule } from './procedimientos/procedimientos.module';
     GoogleApiModule,
     CasosMaltratoModule,
     CasosConflictoModule,
-    ProcedimientosModule
+    ProcedimientosModule,
+    BusquedasModule
   ],
   controllers: [],
   providers: [],

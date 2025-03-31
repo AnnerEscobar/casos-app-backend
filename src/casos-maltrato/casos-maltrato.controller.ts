@@ -3,6 +3,7 @@ import { CasosMaltratoService } from './casos-maltrato.service';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CasosMaltratoDocument } from './entities/casos-maltrato.entity';
 
 @Controller('maltratos')
 export class CasosMaltratoController {
@@ -17,9 +18,10 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.create(createCasosConflictoDto, file);
   }
 
-
-
-
+  @Get()
+  async findAll(): Promise<CasosMaltratoDocument[]> {
+    return this.casosMaltratoService.findAll();
+  }
 
 
 
@@ -29,10 +31,6 @@ export class CasosMaltratoController {
 
   //casos sin implemententar
 
-  @Get()
-  findAll() {
-    return this.casosMaltratoService.findAll();
-  }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
