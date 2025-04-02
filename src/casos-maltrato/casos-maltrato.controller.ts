@@ -1,10 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { CasosMaltratoService } from './casos-maltrato.service';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CasosMaltratoDocument } from './entities/casos-maltrato.entity';
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+
+@UseGuards(JwtAuthGuard)
 @Controller('maltratos')
 export class CasosMaltratoController {
   constructor(private readonly casosMaltratoService: CasosMaltratoService) { }

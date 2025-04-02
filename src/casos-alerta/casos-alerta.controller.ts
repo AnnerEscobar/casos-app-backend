@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, Query, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, Query, NotFoundException, UseGuards } from '@nestjs/common';
 import { CasosAlertaService } from './casos-alerta.service';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CasosAlerta } from './entities/casos-alerta.entity';
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('alertas')
 export class CasosAlertaController {
 

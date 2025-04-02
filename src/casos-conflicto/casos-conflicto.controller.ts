@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, HttpException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, HttpException, UseInterceptors, UploadedFile, UseGuards } from '@nestjs/common';
 import { CasosConflictoService } from './casos-conflicto.service';
 import { CreateCasosConflictoDto } from './dto/create-casos-conflicto.dto';
 import { UpdateCasosConflictoDto } from './dto/update-casos-conflicto.dto';
 import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { CasosConflictoDocument } from './entities/casos-conflicto.entity';
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('conflictos')
 export class CasosConflictoController {
 

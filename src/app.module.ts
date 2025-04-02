@@ -7,6 +7,8 @@ import { CasosMaltratoModule } from './casos-maltrato/casos-maltrato.module';
 import { CasosConflictoModule } from './casos-conflicto/casos-conflicto.module';
 import { ProcedimientosModule } from './procedimientos/procedimientos.module';
 import { BusquedasModule } from './busquedas/busquedas.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -17,7 +19,9 @@ import { BusquedasModule } from './busquedas/busquedas.module';
     CasosMaltratoModule,
     CasosConflictoModule,
     ProcedimientosModule,
-    BusquedasModule
+    BusquedasModule,
+    AuthModule,
+    UsersModule
   ],
   controllers: [],
   providers: [],

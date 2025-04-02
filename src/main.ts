@@ -1,14 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { Response } from 'express';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
+
 
 async function bootstrap() {
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule) as NestExpressApplication;
+
   app.enableCors({
-    origin: 'http://localhost:4200',
-    methods: 'GET,POST,PUT,DELETE',
-    allowedHeaders: 'Content-Type, Accept',
+   origin: 'http://localhost:4200', // Permitir peticiones desde Angular
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization', // <== aquí está la clave
   });
   
     // Configura ValidationPipe globalmente
