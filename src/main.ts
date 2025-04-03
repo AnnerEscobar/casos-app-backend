@@ -1,8 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import { Response } from 'express';
-import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 
