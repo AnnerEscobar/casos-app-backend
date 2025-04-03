@@ -2,9 +2,11 @@ import { Module } from '@nestjs/common';
 import { GoogleApiService } from './google-api.service';
 import { GoogleApiController } from './google-api.controller';
 import { GoogleDriveConfig, GoogleDriveModule } from 'nestjs-googledrive-upload';
-import * as googleConfig from '../../config/google-credentials.json';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+
+const googleConfig = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+
 
 @Module({
   controllers: [GoogleApiController],
