@@ -5,8 +5,13 @@ import { GoogleDriveConfig, GoogleDriveModule } from 'nestjs-googledrive-upload'
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
-const googleConfig = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+const googleCredentialsRaw = process.env.GOOGLE_CREDENTIALS_JSON;
 
+if (!googleCredentialsRaw) {
+  throw new Error('GOOGLE_CREDENTIALS_JSON is not set.');
+}
+
+const googleConfig = JSON.parse(googleCredentialsRaw);
 
 @Module({
   controllers: [GoogleApiController],
