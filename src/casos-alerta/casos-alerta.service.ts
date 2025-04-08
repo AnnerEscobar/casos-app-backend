@@ -56,6 +56,7 @@ export class CasosAlertaService {
 
       return newCaso.save()
     } catch (error) {
+      console.error('Error interno al crear el caso:', error);
       throw new BadRequestException(`Error al crear el caso, ${error}`)
     }
   }
