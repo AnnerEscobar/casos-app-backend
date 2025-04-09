@@ -9,7 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule) as NestExpressApplication;
 
   app.enableCors({
-   origin: ['http://localhost:4200, https://casos-app-backend-production.up.railway.app'], // Permitir peticiones desde Angular
+   origin: ['http://localhost:4200, https://sgicdb.netlify.app'], // Permitir peticiones desde Angular
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization', // <== aquí está la clave
