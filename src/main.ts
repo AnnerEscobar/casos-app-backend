@@ -11,7 +11,7 @@ async function bootstrap() {
   //agregar esto antes del merge: https://sgicdb.netlify.app
 
   app.enableCors({
-   origin: 'http://localhost:4200', // Permitir peticiones desde Angular
+   origin: 'https://sgicdb.netlify.app', // Permitir peticiones desde Angular
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization', // <== aquí está la clave
