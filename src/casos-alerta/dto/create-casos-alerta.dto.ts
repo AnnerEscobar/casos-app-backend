@@ -13,7 +13,7 @@ export class CreateCasosAlertaDto {
 
     @IsString()
     @IsNotEmpty()
-    @Matches(/^M0030-\d{4}-\d+$/,{
+    @Matches(/^M0030-\d{4}-\d+$/, {
         message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX-'
     })
     numeroMp: string;
@@ -23,7 +23,7 @@ export class CreateCasosAlertaDto {
     @IsNotEmpty()
     @Matches(/^\d+-\d{4}$/, {
         message: 'El numero de alerta, debe seguir el formato XXXX-AAAA'
-    } )
+    })
     numeroAlerta: string;
 
 
@@ -52,5 +52,27 @@ export class CreateCasosAlertaDto {
     @IsOptional()
     @IsString()
     fileUrls: string;
+
+    @IsOptional()
+    @IsString()
+    direccionLocalizacion?: string;
+
+    @IsOptional()
+    @IsString()
+    nombreAcompanante?: string;
+
+    @IsOptional()
+    @IsString()
+    telefono?: string;
+
+    @IsOptional()
+    @IsString()
+    horaLocalizacion?: string;
+
+    @IsOptional()
+    @IsDate()
+    @Type(() => Date)
+    fechaLocalizacion?: Date;
+
 
 }
