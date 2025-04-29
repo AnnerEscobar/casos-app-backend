@@ -3,7 +3,7 @@ import { Document } from 'mongoose';
 
 @Schema()
 export class CasosAlerta extends Document {
-  
+
   @Prop({ required: true, unique: true })
   numeroDeic: string;
 
@@ -39,6 +39,22 @@ export class CasosAlerta extends Document {
 
   @Prop()
   fileUrls: string;
+
+  @Prop({ required: false })
+  direccionLocalizacion?: string;
+
+  @Prop({ required: false })
+  nombreAcompanante?: string;
+
+  @Prop({ required: false })
+  telefono?: string;
+
+  @Prop({ required: false })
+  horaLocalizacion?: string;
+
+  @Prop({ required: false })
+  fechaLocalizacion?: Date;
+
 }
 
 export const CasosAlertaSchema = SchemaFactory.createForClass(CasosAlerta);
