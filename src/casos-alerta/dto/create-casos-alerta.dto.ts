@@ -1,5 +1,6 @@
 import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, Matches, IsEmpty, IsArray, ArrayNotEmpty } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Prop } from '@nestjs/mongoose';
 
 export class CreateCasosAlertaDto {
 
@@ -74,5 +75,15 @@ export class CreateCasosAlertaDto {
     @Type(() => Date)
     fechaLocalizacion?: Date;
 
+    seguimientos?: {
+        nuevoEstado: string;
+        fecha: Date;
+        nombreAcompanante?: string;
+        telefono?: string;
+        direccionLocalizacion?: string;
+        horaLocalizacion?: string;
+        fechaLocalizacion?: Date;
+        archivos: string[];
+      }[];
 
 }
