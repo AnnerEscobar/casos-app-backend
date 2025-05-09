@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, Query, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseInterceptors, UploadedFile, Query, NotFoundException, UseGuards, UploadedFiles } from '@nestjs/common';
 import { CasosAlertaService } from './casos-alerta.service';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { CasosAlerta } from './entities/casos-alerta.entity';
 import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
@@ -18,7 +18,7 @@ export class CasosAlertaController {
   async create(
     @Body() createCasosAlertaDto: CreateCasosAlertaDto,
     @UploadedFile() file: Express.Multer.File,
-  ){
+  ) {
     return this.casosAlertaService.create(createCasosAlertaDto, file)
   }
 
@@ -27,14 +27,34 @@ export class CasosAlertaController {
     return this.casosAlertaService.findAll();
   }
 
-    // Buscar alertas por número de expediente MP
-    @Get('por-expedienteMP')
-    async buscarPorNumeroMp(@Query('numeroMp') numeroMp: string): Promise<CasosAlerta[]> {
-      if (!numeroMp) {
-        throw new NotFoundException('El número de expediente MP es requerido.');
-      }
-      return this.casosAlertaService.buscarPorNumeroMp(numeroMp);
+  // Buscar alertas por número de expediente MP
+  @Get('por-expedienteMP')
+  async buscarPorNumeroMp(@Query('numeroMp') numeroMp: string): Promise<CasosAlerta[]> {
+    if (!numeroMp) {
+      throw new NotFoundException('El número de expediente MP es requerido.');
     }
+    return this.casosAlertaService.buscarPorNumeroMp(numeroMp);
+  }
+
+
+  //endpoing para agregar un seguimiento a un caso de alerta
+  @Patch('seguimiento/:numeroDeic')
+  @UseInterceptors(FilesInterceptor('files'))
+  async actualizarCasoAlerta(
+    @Param('numeroDeic') numeroDeic: string,
+    @Body() dto: UpdateCasosAlertaDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.casosAlertaService.actualizarCasoConSeguimiento(numeroDeic, dto, files);
+  }
+
+
+  @Get('by-deic/:numeroDeic')
+  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
+    return this.casosAlertaService.buscarPorNumeroDeic(numeroDeic);
+  }
+
+
 
 
   //metodos no utilizados

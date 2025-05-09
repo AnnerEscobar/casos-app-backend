@@ -1,8 +1,11 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document } from 'mongoose';
 
+
+export type CasosAlertaDocument = CasosAlerta & Document;
+
 @Schema()
-export class CasosAlerta extends Document {
+export class CasosAlerta {
 
   @Prop({ required: true, unique: true })
   numeroDeic: string;
@@ -54,6 +57,18 @@ export class CasosAlerta extends Document {
 
   @Prop({ required: false })
   fechaLocalizacion?: Date;
+
+  @Prop({ type: Array, default: [] })
+  seguimientos?: {
+      nuevoEstado: string;
+      fecha: Date;
+      nombreAcompanante?: string;
+      telefono?: string;
+      direccionLocalizacion?: string;
+      horaLocalizacion?: string;
+      fechaLocalizacion?: Date;
+      archivos: string[];
+  }[];
 
 }
 
