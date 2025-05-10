@@ -21,6 +21,22 @@ export class CasosConflictoController {
     return this.casosConflictoService.create(createCasosConflictoDto, file);
   }
 
+  @Patch('seguimiento/:numeroDeic')
+  @UseInterceptors(FileInterceptor('file')) // Usa FilesInterceptor si quieres permitir varios
+  async actualizarSeguimiento(
+    @Param('numeroDeic') numeroDeic: string,
+    @Body() body: { estadoInvestigacion: string },
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.casosConflictoService.agregarSeguimiento(numeroDeic, body.estadoInvestigacion, file);
+  }
+
+  @Get('buscar/:numeroDeic')
+  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
+    return this.casosConflictoService.buscarPorNumeroDeic(numeroDeic);
+  }
+
+
 
   @Get()
   async findAll(): Promise<CasosConflictoDocument[]> {

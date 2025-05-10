@@ -22,6 +22,19 @@ export class VictimaInfractor {
   direccion: string;
 }
 
+// Subdocumento para seguimientos
+@Schema({ _id: false })
+export class Seguimiento {
+  @Prop({ default: Date.now })
+  fecha: Date;
+
+  @Prop({ required: true })
+  estado: string;
+
+  @Prop({ type: [String], required: true })
+  archivos: string[];
+}
+
 // Esquema principal
 @Schema({ timestamps: true }) // Agrega createdAt y updatedAt automáticamente
 export class CasosConflicto  extends Document {
@@ -48,8 +61,12 @@ export class CasosConflicto  extends Document {
 
   @Prop({ type: [String], required: Optional })
   fileUrls: string[];
+
+    @Prop({ type: [Seguimiento], default: [] })
+      seguimientos: Seguimiento[];
 }
 
 // Genera los esquemas
 export const VictimaInfractorSchema = SchemaFactory.createForClass(VictimaInfractor);
+export const SeguimientoSchema = SchemaFactory.createForClass(Seguimiento);
 export const CasosConflictoSchema = SchemaFactory.createForClass(CasosConflicto);
