@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
 import { CasosMaltrato, CasosMaltratoDocument } from './entities/casos-maltrato.entity';
@@ -60,6 +60,54 @@ export class CasosMaltratoService {
     }
 
   }
+
+async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File) {
+  const caso = await this.casoModel.findOne({ numeroDeic });
+
+  if (!caso) {
+    throw new NotFoundException('Caso no encontrado');
+  }
+ // ID de la carpeta de Maltrato en Drive
+  let fileUrl: string | null = null;
+
+  if (file) {
+    const numeroSeguimiento = caso.seguimientos.length + 1;
+    const newFileName = `Seguimiento(${numeroSeguimiento})-${numeroDeic}${extname(file.originalname)}`;
+    const renamedFile = {
+      ...file,
+      originalname: newFileName,
+    };
+    fileUrl = await this.googleApiService.uploadFile(renamedFile);
+  }
+
+  const seguimiento = {
+    fecha: new Date(),
+    estado,
+    archivos: fileUrl ? [fileUrl] : [],
+  };
+
+  caso.seguimientos.push(seguimiento);
+  caso.estadoInvestigacion = estado;
+  console.log('Subiendo archivo a carpeta de pruebas...');
+  await caso.save();
+  console.log('Archivo subido con éxito:');
+  return { mensaje: 'Seguimiento agregado correctamente', seguimiento };
+}
+
+
+async buscarPorNumeroDeic(numeroDeic: string): Promise<CasosMaltratoDocument> {
+  const caso = await this.casoModel.findOne({ numeroDeic });
+
+  if (!caso) {
+    throw new NotFoundException(`No se encontró ningún caso con número DEIC: ${numeroDeic}`);
+  }
+
+  return caso;
+}
+
+
+
+  
 
 
   //no implementados
