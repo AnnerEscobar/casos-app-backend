@@ -26,6 +26,22 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.findAll();
   }
 
+  @Patch('seguimiento/:numeroDeic')
+  @UseInterceptors(FileInterceptor('file')) // Usa FilesInterceptor si quieres permitir varios
+  async actualizarSeguimiento(
+    @Param('numeroDeic') numeroDeic: string,
+    @Body() body: { estadoInvestigacion: string },
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    return this.casosMaltratoService.agregarSeguimiento(numeroDeic, body.estadoInvestigacion, file);
+  }
+
+  @Get('buscar/:numeroDeic')
+  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
+    return this.casosMaltratoService.buscarPorNumeroDeic(numeroDeic);
+  }
+
+
 
 
 
