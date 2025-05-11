@@ -9,6 +9,7 @@ import { ProcedimientosModule } from './procedimientos/procedimientos.module';
 import { BusquedasModule } from './busquedas/busquedas.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { CaratulasModule } from './caratulas/caratulas.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { UsersModule } from './users/users.module';
     ProcedimientosModule,
     BusquedasModule,
     AuthModule,
-    UsersModule
+    UsersModule,
+    CaratulasModule
   ],
   controllers: [],
   providers: [],
