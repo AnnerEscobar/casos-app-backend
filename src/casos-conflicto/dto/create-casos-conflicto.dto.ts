@@ -13,8 +13,8 @@ export class CreateCasosConflictoDto {
 
 
     @IsString()
-    @Matches(/^M0030-\d{4}-\d+$/, {
-        message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX-'
+    @Matches(/^(?:M0030|M0004)-\d{4}-\d+$/, {
+        message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX- o M0004-AAAA-XXX'
     })
     @IsOptional()
     numeroMp: string;

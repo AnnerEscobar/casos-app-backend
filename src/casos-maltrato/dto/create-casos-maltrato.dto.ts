@@ -11,12 +11,19 @@ export class CreateCasosMaltratoDto {
     numeroDeic: string;
 
 
-    @IsString()
-    @Matches(/^M0030-\d{4}-\d+$/, {
-        message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX-'
-    })
-    @IsOptional()
-    numeroMp: string;
+@IsString()
+@Matches(
+  /^(?:M0030-\d{4}-\d+|MP\d{3}-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+|\d{3}-\d{4})$/,
+  {
+    message: `El numeroMp debe seguir uno de estos formatos:
+      • M0030-AAAA-NNN
+      • MPXXX-AAAA-NNN
+      • IC/PNCORLLATXXX-AAAA-NNN
+      • NNN-AAAA`
+  }
+)
+@IsOptional()
+numeroMp: string;
 
 
     @IsString()

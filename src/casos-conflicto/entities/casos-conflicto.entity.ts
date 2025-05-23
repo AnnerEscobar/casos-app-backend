@@ -46,7 +46,7 @@ export class CasosConflicto  extends Document {
 
   @Prop({
     required: true,
-    match: /^M0030-\d{4}-\d+$/,
+    match: /^(?:M0030|M0004)-\d{4}-\d+$/,
   })
   numeroMp: string;
 

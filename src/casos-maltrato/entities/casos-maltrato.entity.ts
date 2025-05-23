@@ -44,11 +44,16 @@ export class CasosMaltrato extends Document {
     })
     numeroDeic: string;
 
-    @Prop({
-        required: true,
-        match: /^M0030-\d{4}-\d+$/,
-    })
-    numeroMp: string;
+   @Prop({
+  required: true,
+  match: [
+    /^(?:M0030-\d{4}-\d+|MP\d{3}-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+|\d{3}-\d{4})$/,
+    'El numeroMp debe seguir uno de estos formatos: ' +
+    'M0030-AAAA-NNNN, MPXXX-AAAA-NNNN, IC/PNCORLLATXXX-AAAA-NNNN o NNN-AAAA'
+  ],
+})
+numeroMp: string;
+
 
     @Prop({ required: true })
     estadoInvestigacion: string;
