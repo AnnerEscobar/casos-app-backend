@@ -22,6 +22,7 @@ export class CasosAlertaController {
     return this.casosAlertaService.create(createCasosAlertaDto, file)
   }
 
+
   @Get()
   async findAll(): Promise<CasosAlerta[]> {
     return this.casosAlertaService.findAll();

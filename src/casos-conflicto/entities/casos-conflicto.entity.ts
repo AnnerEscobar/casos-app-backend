@@ -5,7 +5,7 @@ import { Document } from 'mongoose';
 export type CasosConflictoDocument = CasosConflicto & Document;
 
 // Subdocumento para infractores y víctimas
-@Schema({ _id: false }) // No genera un _id independiente para cada subdocumento
+@Schema({ _id: false, timestamps:true }) // No genera un _id independiente para cada subdocumento
 
 export class VictimaInfractor {
 
@@ -23,7 +23,7 @@ export class VictimaInfractor {
 }
 
 // Subdocumento para seguimientos
-@Schema({ _id: false })
+@Schema({ _id: false, timestamps: true })
 export class Seguimiento {
   @Prop({ default: Date.now })
   fecha: Date;

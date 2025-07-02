@@ -1,10 +1,11 @@
+import { Optional } from "@nestjs/common";
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
 import { Document } from 'mongoose';
 
 
 export type CasosAlertaDocument = CasosAlerta & Document;
 
-@Schema()
+@Schema({ timestamps: true})
 export class CasosAlerta {
 
   @Prop({ required: true, unique: true })
@@ -40,8 +41,8 @@ export class CasosAlerta {
     direccionDetallada: string;
   };
 
-  @Prop()
-  fileUrls: string;
+  @Prop({ type: [String], required: Optional })
+     fileUrls: string[];
 
   @Prop({ required: false })
   direccionLocalizacion?: string;

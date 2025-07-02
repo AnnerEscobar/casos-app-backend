@@ -50,9 +50,10 @@ export class CreateCasosAlertaDto {
         direccionDetallada: string;
     };
 
+     @IsArray()
     @IsOptional()
-    @IsString()
-    fileUrls: string;
+    @IsString({ each: true })
+    fileUrls: string[];
 
     @IsOptional()
     @IsString()

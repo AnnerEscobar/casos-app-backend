@@ -5,7 +5,7 @@ import { Response } from 'express'; // Importar Response desde express
 
 @Controller('busquedas')
 export class BusquedasController {
-  constructor(private readonly busquedasService: BusquedasService) {}
+  constructor(private readonly busquedasService: BusquedasService) { }
 
   @Get('por-expedienteMp')
   async buscarPorExpedienteMP(@Query('numeroMp') numeroMp: string) {
@@ -16,28 +16,39 @@ export class BusquedasController {
   }
 
   @Get('por-numero-deic')
-async buscarPorNumeroDeic(@Query('numeroDeic') numeroDeic: string) {
-  if (!numeroDeic) {
-    throw new NotFoundException('El número DEIC es requerido.');
+  async buscarPorNumeroDeic(@Query('numeroDeic') numeroDeic: string) {
+    if (!numeroDeic) {
+      throw new NotFoundException('El número DEIC es requerido.');
+    }
+    return this.busquedasService.buscarPorNumeroDeic(numeroDeic);
   }
-  return this.busquedasService.buscarPorNumeroDeic(numeroDeic);
-}
 
-@Get('por-numero-alerta')
-async buscarPorNumeroAlerta(@Query('numeroAlerta') numeroAlerta: string) {
-  if (!numeroAlerta) {
-    throw new NotFoundException('El número de alerta es requerido.');
+  @Get('por-numero-alerta')
+  async buscarPorNumeroAlerta(@Query('numeroAlerta') numeroAlerta: string) {
+    if (!numeroAlerta) {
+      throw new NotFoundException('El número de alerta es requerido.');
+    }
+    return this.busquedasService.buscarPorAlertaAlbaKeneth(numeroAlerta);
   }
-  return this.busquedasService.buscarPorAlertaAlbaKeneth(numeroAlerta);
-}
 
-@Get('por-nombre') // Ruta relativa: /busquedas/por-nombre
-async buscarPorNombre(@Query('nombre') nombre: string) {
-  if (!nombre) {
-    throw new NotFoundException('El nombre es requerido.');
+  @Get('por-nombre') // Ruta relativa: /busquedas/por-nombre
+  async buscarPorNombre(@Query('nombre') nombre: string) {
+    if (!nombre) {
+      throw new NotFoundException('El nombre es requerido.');
+    }
+    return this.busquedasService.buscarPorNombre(nombre);
   }
-  return this.busquedasService.buscarPorNombre(nombre);
-}
+
+  @Get('buscar')
+  async buscar(@Query() filtros: any) {
+    return this.busquedasService.buscarCasosFiltrados(filtros);
+  }
+
+  @Get('estadisticas-mensuales')
+  obtenerEstadisticasMensuales() {
+    return this.busquedasService.obtenerEstadisticasMensuales();
+  }
+
 
 
 
