@@ -5,6 +5,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from './entities/user.schema';
 import * as bcrypt from 'bcrypt';
 import { Model } from 'mongoose';
+import { Usuario } from 'src/auth/entities/auth.entity';
 
 @Injectable()
 export class UsersService {
@@ -49,6 +50,10 @@ export class UsersService {
       .exec();
     if (!user) throw new NotFoundException('Usuario no encontrado');
     return { email: user.email, role: user.role };
+  }
+
+   async findById(id: string): Promise<Usuario | null> {
+    return this.userModel.findById(id);
   }
 
 }
