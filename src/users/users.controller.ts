@@ -13,8 +13,6 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
-
-  @UseGuards(JwtAuthGuard)
   @Get('getUserData')
   async getUserData(@Req() req: any) {
     const userId = req.user._id;
