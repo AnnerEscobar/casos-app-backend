@@ -5,6 +5,9 @@ export type UserDocument = User & Document;
 
 @Schema({ timestamps: true }) // Agrega createdAt y updatedAt automáticamente
 export class User {
+  
+  _id?: string; // Mongoose maneja el ID automáticamente, pero puedes definirlo aquí si lo necesitas
+  
   @Prop({ required: true, unique: true })
   email: string;
 
