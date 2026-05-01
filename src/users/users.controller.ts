@@ -14,8 +14,9 @@ export class UsersController {
   }
 
   @Get('getUserData')
+  @UseGuards(JwtAuthGuard)
   async getUserData(@Req() req: any) {
-    const userId = req.user._id;
+    const userId = req.user.userId; // El ID del usuario autenticado viene en req.user gracias a JwtStrategy
     return this.usersService.getUserData(userId);
   }
 }
