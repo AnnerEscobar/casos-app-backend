@@ -47,9 +47,9 @@ export class CasosMaltrato extends Document {
    @Prop({
   required: true,
   match: [
-    /^(?:M0030-\d{4}-\d+|MP\d{3}-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+|\d{3}-\d{4})$/,
+    /^(?:(?:MPE01|M0008|MP004|M0030|MP001)-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+)$/,
     'El numeroMp debe seguir uno de estos formatos: ' +
-    'M0030-AAAA-NNNN, MPXXX-AAAA-NNNN, IC/PNCORLLATXXX-AAAA-NNNN o NNN-AAAA'
+    'MPE01-AAAA-NNNN, M0008-AAAA-NNNN, IC/PNCORLLATXXX-AAAA-NNNN, MP004-AAAA-NNNN, M0030-AAAA-NNNN o MP001-AAAA-NNNN'
   ],
 })
 numeroMp: string;

@@ -13,13 +13,15 @@ export class CreateCasosMaltratoDto {
 
 @IsString()
 @Matches(
-  /^(?:M0030-\d{4}-\d+|MP\d{3}-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+|\d{3}-\d{4})$/,
+  /^(?:(?:MPE01|M0008|MP004|M0030|MP001)-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+)$/,
   {
     message: `El numeroMp debe seguir uno de estos formatos:
-      • M0030-AAAA-NNN
-      • MPXXX-AAAA-NNN
-      • IC/PNCORLLATXXX-AAAA-NNN
-      • NNN-AAAA`
+      MPE01-AAAA-NNN
+      M0008-AAAA-NNN
+      IC/PNCORLLATXXX-AAAA-NNN
+      MP004-AAAA-NNN
+      M0030-AAAA-NNN
+      MP001-AAAA-NNN`
   }
 )
 @IsOptional()

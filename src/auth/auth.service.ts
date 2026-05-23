@@ -2,9 +2,6 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Usuario } from './entities/auth.entity';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Injectable()
@@ -13,7 +10,6 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    @InjectModel(Usuario.name) private userModel: Model<Usuario>,
   ) { }
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -84,9 +80,7 @@ async register(userData: { email: string; password: string }) {
 
 
   async changePassword(userId: string, dto: ChangePasswordDto) {
-    console.log('Cambiar contraseña de usuario:', userId);
-    const user = await this.userModel.findById(userId);
-    console.log('Cambiar contraseña de usuario despues de la llamada:', userId);
+    const user = await this.usersService.findById(userId);
     if (!user) throw new NotFoundException('Usuario no encontrado');
 
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
@@ -96,10 +90,6 @@ async register(userData: { email: string; password: string }) {
     await user.save();
 
     return { message: 'Contraseña actualizada correctamente' };
-  }
-
-  async findById(id: string): Promise<Usuario | null> {
-    return this.userModel.findById(id);
   }
 
 }

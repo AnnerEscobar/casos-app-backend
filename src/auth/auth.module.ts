@@ -8,19 +8,20 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Usuario, UsuarioSchema } from './entities/auth.entity';
+import { AuthRateLimitService } from './auth-rate-limit.service';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     JwtModule.register({
-      secret: 'jwt_secret_key', // Reemplaza por variable de entorno en producción
+      secret: process.env.JWT_SECRET ?? 'local_jwt_secret',
       signOptions: { expiresIn: '1h' },
     }),
      MongooseModule.forFeature([{ name: Usuario.name, schema: UsuarioSchema }])
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, AuthRateLimitService],
   exports: [AuthService],
   
 

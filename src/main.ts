@@ -7,11 +7,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 async function bootstrap() {
 
   const app = await NestFactory.create(AppModule) as NestExpressApplication;
-
-  //agregar esto antes del merge: https://sgicdb.netlify.app
+  const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'https://sgicdb.netlify.app,http://localhost:4200')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   app.enableCors({
-   origin: ['https://sgicdb.netlify.app', 'http://localhost:4200'], // Permitir peticiones desde Angular
+   origin: allowedOrigins,
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization', // <== aquí está la clave

@@ -14,8 +14,8 @@ export class CreateCasosAlertaDto {
 
     @IsString()
     @IsNotEmpty()
-    @Matches(/^(?:M0030|M0008)-\d{4}-\d+$/, {
-        message: 'El numero Mp, debe seguir el formato M0030-AAAA-XXX-'
+    @Matches(/^M0030-\d{4}-\d+$/, {
+        message: 'El numero Mp debe seguir el formato M0030-AAAA-XXX'
     })
     numeroMp: string;
 

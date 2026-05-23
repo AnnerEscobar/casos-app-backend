@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { GoogleApiService } from 'src/google-api/google-api.service';
 import { extname } from 'path';
+import { assertValidCaseNumber, assertValidMaltratoMpNumber } from 'src/common/case-number.validator';
 
 @Injectable()
 export class CasosMaltratoService {
@@ -19,6 +20,8 @@ export class CasosMaltratoService {
 
   async create(CreateCasosMaltratoDto: CreateCasosMaltratoDto, file: Express.Multer.File): Promise<CasosMaltrato> {
     try {
+      CreateCasosMaltratoDto.numeroDeic = assertValidCaseNumber('maltrato', CreateCasosMaltratoDto.numeroDeic);
+      CreateCasosMaltratoDto.numeroMp = assertValidMaltratoMpNumber(CreateCasosMaltratoDto.numeroMp);
       // 📌 1️⃣ Verificar si el caso ya existe
       const existingCaso = await this.casoModel.findOne({ numeroDeic: CreateCasosMaltratoDto.numeroDeic });
       if (existingCaso) {
@@ -45,6 +48,9 @@ export class CasosMaltratoService {
 
       return newCaso.save();
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       console.log(error);
       throw new BadRequestException(`Error al crear el caso, ${error}`);
       

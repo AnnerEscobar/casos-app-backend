@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { GoogleApiService } from './google-api.service';
 import { FileInterceptor } from '@nestjs/platform-express/multer';
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('google-drive')
 export class GoogleApiController {
 

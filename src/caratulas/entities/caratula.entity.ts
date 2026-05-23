@@ -21,6 +21,9 @@ export class Caratula {
   nombre: string;
 
   @Prop()
+  edad?: string;
+
+  @Prop()
   fecha_Nac?: Date;
 
   @Prop()

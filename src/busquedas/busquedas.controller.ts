@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Param, Delete, Query, NotFoundException, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Query, NotFoundException, Res, UseGuards } from '@nestjs/common';
 import { BusquedasService } from './busquedas.service';
 import { CreateBusquedaDto } from './dto/create-busqueda.dto';
 import { Response } from 'express'; // Importar Response desde express
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('busquedas')
 export class BusquedasController {
   constructor(private readonly busquedasService: BusquedasService) { }

@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Res, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, Res, Query, UseGuards } from '@nestjs/common';
 import { CaratulasService } from './caratulas.service';
 import { CreateCaratulaDto } from './dto/create-caratula.dto';
 import { Caratula } from './entities/caratula.entity';
 import { Response } from 'express';
+import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
 
+@UseGuards(JwtAuthGuard)
 @Controller('caratulas')
 export class CaratulasController {
 

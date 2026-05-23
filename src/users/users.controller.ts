@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
@@ -14,7 +15,6 @@ export class UsersController {
   }
 
   @Get('getUserData')
-  @UseGuards(JwtAuthGuard)
   async getUserData(@Req() req: any) {
     const userId = req.user.userId; // El ID del usuario autenticado viene en req.user gracias a JwtStrategy
     return this.usersService.getUserData(userId);

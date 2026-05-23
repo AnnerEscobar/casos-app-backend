@@ -20,6 +20,10 @@ export class CreateCaratulaDto {
   nombre: string;
 
   @IsOptional()
+  @IsString()
+  edad?: string;
+
+  @IsOptional()
   @Type(() => Date)
   fecha_Nac?: Date;
 

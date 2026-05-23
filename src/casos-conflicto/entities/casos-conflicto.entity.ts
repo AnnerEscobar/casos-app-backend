@@ -40,13 +40,13 @@ export class Seguimiento {
 export class CasosConflicto  extends Document {
   @Prop({
     required: true,
-    match: /^DEIC53-\d{4}-\d{2}-\d{2}-\d+$/,
+    match: /^(?:DEIC53-\d{4}-\d{2}-\d{2}-\d+|AC\d{6})$/,
   })
   numeroDeic: string;
 
   @Prop({
     required: true,
-    match: /^(?:M0030|M0004)-\d{4}-\d+$/,
+    match: /^(?:M0004|MP001|MPE01)-\d{4}-\d+$/,
   })
   numeroMp: string;
 

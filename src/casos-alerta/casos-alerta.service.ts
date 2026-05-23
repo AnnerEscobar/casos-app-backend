@@ -6,6 +6,7 @@ import { CasosAlerta, CasosAlertaDocument, } from './entities/casos-alerta.entit
 import { Model } from 'mongoose';
 import { GoogleApiService } from 'src/google-api/google-api.service';
 import { extname } from 'path';
+import { assertValidAlertaMpNumber, assertValidCaseNumber } from 'src/common/case-number.validator';
 
 @Injectable()
 export class CasosAlertaService {
@@ -21,6 +22,8 @@ export class CasosAlertaService {
   async create(createCasosAlertaDto: CreateCasosAlertaDto, file: Express.Multer.File): Promise<CasosAlerta> {
 
     try {
+      createCasosAlertaDto.numeroDeic = assertValidCaseNumber('alerta', createCasosAlertaDto.numeroDeic);
+      createCasosAlertaDto.numeroMp = assertValidAlertaMpNumber(createCasosAlertaDto.numeroMp);
       const existingCaso = await this.casosAlertaModel.findOne({ numeroDeic: createCasosAlertaDto.numeroDeic });
       if (existingCaso) {
         throw new BadRequestException('El caso con este número DEIC ya está registrado. No se guardará el archivo.');
@@ -56,6 +59,9 @@ export class CasosAlertaService {
 
       return newCaso.save()
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       console.error('Error interno al crear el caso:', error);
       throw new BadRequestException(`Error al crear el caso, ${error}`)
     }

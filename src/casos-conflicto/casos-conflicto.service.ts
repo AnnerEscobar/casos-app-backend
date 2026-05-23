@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { CasosConflicto, CasosConflictoDocument } from './entities/casos-conflicto.entity';
 import { Model } from 'mongoose';
 import { extname } from 'path';
+import { assertValidCaseNumber, assertValidConflictoMpNumber } from 'src/common/case-number.validator';
 
 @Injectable()
 export class CasosConflictoService {
@@ -18,6 +19,8 @@ export class CasosConflictoService {
 
   async create(createCasosConflictoDto: CreateCasosConflictoDto, file: Express.Multer.File): Promise<CasosConflicto> {
     try {
+      createCasosConflictoDto.numeroDeic = assertValidCaseNumber('conflicto', createCasosConflictoDto.numeroDeic);
+      createCasosConflictoDto.numeroMp = assertValidConflictoMpNumber(createCasosConflictoDto.numeroMp);
       // 📌 1️⃣ Verificar si el caso ya existe
       const existingCaso = await this.casoModel.findOne({ numeroDeic: createCasosConflictoDto.numeroDeic });
       if (existingCaso) {
