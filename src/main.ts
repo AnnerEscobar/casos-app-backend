@@ -7,7 +7,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 async function bootstrap() {
 
   const app = await NestFactory.create(AppModule) as NestExpressApplication;
-  const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'https://sgicdb.netlify.app,http://localhost:4200')
+  // Produccion Netlify: https://sgicdb.netlify.app
+  const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? 'http://localhost:4200')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

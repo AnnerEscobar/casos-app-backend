@@ -23,7 +23,7 @@ export class AuthController {
     const user = await this.authService.validateUser(body.email, body.password);
     const { access_token } = await this.authService.login(user);
     this.authRateLimitService.reset('login', rateLimitIdentifier);
-    const useSecureCookie = this.useSecureCookie();
+    const useSecureCookie = this.useSecureCookie(req);
 
     res.cookie('access_token', access_token, {
       httpOnly: true,
@@ -61,7 +61,7 @@ export class AuthController {
   @Post('logout')
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
     await this.authService.logout(req.user.userId);
-    const useSecureCookie = this.useSecureCookie();
+    const useSecureCookie = this.useSecureCookie(req);
     res.clearCookie('access_token', {
       httpOnly: true,
       sameSite: useSecureCookie ? 'none' : 'lax',
@@ -83,8 +83,13 @@ export class AuthController {
     return `${ip}:${normalizedEmail}`;
   }
 
-  private useSecureCookie(): boolean {
-    return process.env.NODE_ENV === 'production' || process.env.FRONTEND_ORIGIN?.startsWith('https://') === true;
+  private useSecureCookie(req: Request): boolean {
+    const requestOrigin = req.headers.origin;
+    return (
+      process.env.NODE_ENV === 'production' ||
+      requestOrigin?.startsWith('https://') === true ||
+      process.env.FRONTEND_ORIGIN?.startsWith('https://') === true
+    );
   }
 
 }

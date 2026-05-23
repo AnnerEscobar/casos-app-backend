@@ -30,8 +30,11 @@ if (googleCredentialsRaw) {
   controllers: [GoogleApiController],
   providers: [GoogleApiService],
   imports: [
-    GoogleDriveModule.register(googleConfig, /* '1YXw6jxvyeUy7xIAvrLEMvP3kkiSiibph' */
-      '16uyaU1wkYlYrpBnAZpszhqCf1ndv3kHF'  /* prueba/produccion */),
+    GoogleDriveModule.register(
+      googleConfig,
+      process.env.GOOGLE_DRIVE_FOLDER_ID ?? '16uyaU1wkYlYrpBnAZpszhqCf1ndv3kHF' /* '1YXw6jxvyeUy7xIAvrLEMvP3kkiSiibph' */
+      // Desarrollo/pruebas:
+    ),
     MulterModule.register({
       storage: memoryStorage(),
     }),

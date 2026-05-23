@@ -16,12 +16,30 @@ export class InformesService {
   ) {}
 
   async crear(dto: CreateInformeDto): Promise<Informe> {
-    const existente = await this.informeModel.findOne({ numeroDeic: dto.numeroDeic });
+    this.validarFormatoDisponible(dto);
+
+    const numeroDeic = dto.numeroDeic.trim().toUpperCase();
+    const existente = await this.informeModel.findOne({ numeroDeic });
     if (existente) {
       throw new BadRequestException('Ya existe un informe con este número DEIC.');
     }
-    const nuevo = new this.informeModel({ ...dto, estado: 'borrador' });
+    const nuevo = new this.informeModel({ ...dto, numeroDeic, estado: 'borrador' });
     return nuevo.save();
+  }
+
+  private validarFormatoDisponible(dto: CreateInformeDto): void {
+    const tipoInforme = dto.tipoInforme?.toLowerCase();
+    const numeroDeic = dto.numeroDeic?.trim().toUpperCase();
+    const formatoValido =
+      (tipoInforme === 'alerta' && numeroDeic?.startsWith('DEIC52-')) ||
+      (tipoInforme === 'maltrato' && numeroDeic?.startsWith('DEIC51-')) ||
+      (tipoInforme === 'conflicto' && numeroDeic?.startsWith('DEIC53-'));
+
+    if (!formatoValido) {
+      throw new BadRequestException(
+        'El tipo de informe no coincide con el numero DEIC. Usa DEIC52 para alerta, DEIC51 para maltrato o DEIC53 para conflicto.'
+      );
+    }
   }
 
   async obtenerTodos(): Promise<Informe[]> {

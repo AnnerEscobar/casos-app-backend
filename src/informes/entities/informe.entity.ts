@@ -95,6 +95,23 @@ export class Informe {
   // Sección 4 - Entrevistas
   @Prop({ type: Object, default: {} })
   entrevistas: {
+    items?: {
+      titulo: string;
+      persona?: string;
+      modalidad?: 'telefonica' | 'presencial';
+      telefono?: string;
+      lugar?: string;
+      fecha?: Date;
+      hora?: string;
+      dpi?: string;
+      edad?: string;
+      calidadPersona?: string;
+      estadoCivil?: string;
+      ocupacion?: string;
+      vozAtendio?: string;
+      notaIdentificacion?: string;
+      contenido?: string;
+    }[];
     padresEncargados?: string;
     denuncianteTestigos?: string;
     vecinos?: string;
@@ -104,8 +121,17 @@ export class Informe {
   // Sección 5 - Perfilación del lugar
   @Prop({ type: Object, default: {} })
   perfilacionLugar: {
+    fecha?: string;
+    hora?: string;
+    ubicacion?: string;
+    municipioDepartamento?: string;
+    contadorElectrico?: string;
+    documentarFotografias?: boolean;
+    coordenadasGps?: string;
     descripcion?: string;
+    camarasEstado?: 'no_ubicadas' | 'hay';
     camaras?: string;
+    indicadoresEstado?: 'no_ubicados' | 'hay';
     indicadoresAmbientales?: string;
     accesasSalidas?: string;
   };
