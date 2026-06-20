@@ -41,6 +41,14 @@ export class BusquedasController {
     return this.busquedasService.buscarPorNombre(nombre);
   }
 
+  @Get('por-cui')
+  async buscarPorCUI(@Query('cui') cui: string) {
+    if (!cui) {
+      throw new NotFoundException('El CUI/DPI es requerido.');
+    }
+    return this.busquedasService.buscarPorCUI(cui);
+  }
+
   @Get('buscar')
   async buscar(@Query() filtros: any) {
     return this.busquedasService.buscarCasosFiltrados(filtros);

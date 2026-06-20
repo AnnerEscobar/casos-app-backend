@@ -123,6 +123,33 @@ export class BusquedasService {
 
   }
 
+  async buscarPorCUI(cui: string): Promise<any[]> {
+    try {
+      const term = cui.trim();
+      const [maltratos, conflictos] = await Promise.all([
+        this.casosMaltratoModel.find({
+          $or: [
+            { 'infractores.cui': { $regex: term, $options: 'i' } },
+            { 'victimas.cui': { $regex: term, $options: 'i' } },
+          ],
+        }).exec(),
+        this.casosConflictoModel.find({
+          $or: [
+            { 'infractores.cui': { $regex: term, $options: 'i' } },
+            { 'victimas.cui': { $regex: term, $options: 'i' } },
+          ],
+        }).exec(),
+      ]);
+
+      return [
+        ...maltratos.map((maltrato) => ({ ...maltrato.toObject(), tipo: 'Maltrato' })),
+        ...conflictos.map((conflicto) => ({ ...conflicto.toObject(), tipo: 'Conflicto' })),
+      ];
+    } catch (error) {
+      throw new Error(`Error al buscar por CUI/DPI: ${error.message}`);
+    }
+  }
+
 
 async buscarCasosFiltrados(filtros: any): Promise<any[]> {
   const { tipoCaso, estado, fechaInicio, fechaFin } = filtros;
