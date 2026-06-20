@@ -32,7 +32,10 @@ export class AuthController {
       maxAge: 60 * 60 * 1000,
     });
 
-    return { message: 'Sesion iniciada correctamente' };
+    return {
+      message: 'Sesion iniciada correctamente',
+      expiresAt: Date.now() + 60 * 60 * 1000,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
