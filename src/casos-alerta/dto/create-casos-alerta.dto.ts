@@ -42,6 +42,18 @@ export class CreateCasosAlertaDto {
     @IsNotEmpty()
     estadoInvestigacion: string;
 
+    @IsOptional()
+    @IsString()
+    origenAlerta?: string;
+
+    @IsOptional()
+    @IsString()
+    casaHogar?: string;
+
+    @IsOptional()
+    @IsString()
+    ubicacionGps?: string;
+
 
     @IsObject()
     direccion: {

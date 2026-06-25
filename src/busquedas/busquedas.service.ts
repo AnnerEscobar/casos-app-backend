@@ -152,7 +152,7 @@ export class BusquedasService {
 
 
 async buscarCasosFiltrados(filtros: any): Promise<any[]> {
-  const { tipoCaso, estado, fechaInicio, fechaFin } = filtros;
+  const { tipoCaso, estado, fechaInicio, fechaFin, origenAlerta, casaHogar } = filtros;
 
   // ✅ Corrección: usar createdAt, no fechaRegistro
   const fechaFiltro = (fechaInicio && fechaFin) ? {
@@ -167,6 +167,8 @@ async buscarCasosFiltrados(filtros: any): Promise<any[]> {
   if (tipoCaso === 'Alerta Alba-Keneth') {
     const query: any = { ...fechaFiltro };
     if (estado) query.estadoInvestigacion = estado;
+    if (origenAlerta) query.origenAlerta = origenAlerta;
+    if (casaHogar) query.casaHogar = { $regex: casaHogar, $options: 'i' };
 
     const alertas = await this.casosAlertaModel.find(query).exec();
     resultados = alertas.map(alerta => ({ ...alerta.toObject(), tipo: 'Alerta' }));

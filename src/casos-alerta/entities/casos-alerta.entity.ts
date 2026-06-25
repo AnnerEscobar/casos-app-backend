@@ -26,6 +26,15 @@ export class CasosAlerta {
   @Prop({ required: true })
   estadoInvestigacion: string;
 
+  @Prop({ required: false })
+  origenAlerta?: string;
+
+  @Prop({ required: false })
+  casaHogar?: string;
+
+  @Prop({ required: false })
+  ubicacionGps?: string;
+
   @Prop({
     type: {
       departamento: String,
