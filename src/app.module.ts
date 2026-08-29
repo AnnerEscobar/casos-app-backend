@@ -8,7 +8,6 @@ import { CasosConflictoModule } from './casos-conflicto/casos-conflicto.module';
 import { ProcedimientosModule } from './procedimientos/procedimientos.module';
 import { BusquedasModule } from './busquedas/busquedas.module';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
 import { CaratulasModule } from './caratulas/caratulas.module';
 import { InformesModule } from './informes/informes.module';
 
@@ -23,7 +22,6 @@ import { InformesModule } from './informes/informes.module';
     ProcedimientosModule,
     BusquedasModule,
     AuthModule,
-    UsersModule,
     CaratulasModule,
     InformesModule,
   ],

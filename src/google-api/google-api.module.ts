@@ -32,7 +32,7 @@ if (googleCredentialsRaw) {
   imports: [
     GoogleDriveModule.register(
       googleConfig,
-      process.env.GOOGLE_DRIVE_FOLDER_ID ?? '16uyaU1wkYlYrpBnAZpszhqCf1ndv3kHF' /* '1YXw6jxvyeUy7xIAvrLEMvP3kkiSiibph' */
+      process.env.GOOGLE_DRIVE_FOLDER_ID ?? /* '16uyaU1wkYlYrpBnAZpszhqCf1ndv3kHF' */ '1YXw6jxvyeUy7xIAvrLEMvP3kkiSiibph'
       // Desarrollo/pruebas:
     ),
     MulterModule.register({

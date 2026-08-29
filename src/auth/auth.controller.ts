@@ -4,6 +4,10 @@ import { JwtAuthGuard } from './Guards/jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { Request, Response } from 'express';
+import { RolesGuard } from './Guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { UserRole } from './enums/user-role.enum';
+import { CreateAuthDto } from './dto/create-auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -38,9 +42,13 @@ export class AuthController {
     };
   }
 
-  @UseGuards(JwtAuthGuard)
+  
   @Post('register')
-  async register(@Body() body: { email: string; password: string }, @Req() req: Request) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async register(
+    @Body() body: CreateAuthDto, 
+    @Req() req: Request) {
     this.authRateLimitService.assertAllowed('register', this.getRateLimitIdentifier(req, body.email));
     return this.authService.register(body);
   }

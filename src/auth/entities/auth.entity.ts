@@ -1,9 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { UserRole } from '../enums/user-role.enum';
 
 export type UsuarioDocument = Usuario & Document;
 
-@Schema()
+@Schema({ collection: 'users', timestamps: true })
 export class Usuario {
 
     _id?: string; // Mongoose maneja el ID automáticamente, pero puedes definirlo aquí si lo necesitas
@@ -17,8 +18,8 @@ export class Usuario {
     @Prop()
     token?: string;
 
-    @Prop()
-    role?: string;
+    @Prop({type: String, enum: Object.values(UserRole), default: UserRole.INVESTIGADOR, requiered: true})
+    role?: UserRole;
 }
 
 
