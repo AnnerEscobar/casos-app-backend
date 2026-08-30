@@ -1,6 +1,6 @@
 import { Type } from "class-transformer";
 import { IsArray, IsOptional, IsString, Matches, ValidateNested } from "class-validator";
-import { victimaInfractorDto } from "src/casos-conflicto/dto/victima-infractor.dto";
+import { PersonaMaltratoDto } from "./persona-maltrato.dto";
 
 export class CreateCasosMaltratoDto {
     @IsString()
@@ -34,15 +34,15 @@ numeroMp: string;
 
     @IsArray()
     @ValidateNested({ each: true })
-    @Type(() => victimaInfractorDto)
+    @Type(() => PersonaMaltratoDto)
     @IsOptional()
-    infractores: victimaInfractorDto[];
+    sindicados: PersonaMaltratoDto[];
 
     @IsArray()
     @ValidateNested({ each: true })
-    @Type(() => victimaInfractorDto)
+    @Type(() => PersonaMaltratoDto)
     @IsOptional()
-    victimas: victimaInfractorDto[];
+    victimas: PersonaMaltratoDto[];
 
     @IsArray()
     @IsOptional()

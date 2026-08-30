@@ -112,7 +112,7 @@ export class AuthService {
   async findAllUsers() {
     return await this.usuarioModel
       .find()
-      .select('_id nombre email role createdAl')
+      .select('_id nombre email role activo')
       .sort({ email: 1 })
       .lean()
 
