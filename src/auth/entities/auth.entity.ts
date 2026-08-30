@@ -6,21 +6,30 @@ export type UsuarioDocument = Usuario & Document;
 
 @Schema({ collection: 'users', timestamps: true })
 export class Usuario {
+  _id?: string; // Mongoose maneja el ID automáticamente, pero puedes definirlo aquí si lo necesitas
 
-    _id?: string; // Mongoose maneja el ID automáticamente, pero puedes definirlo aquí si lo necesitas
+  @Prop({ required: true, trim: true })
+  nombre: string;
 
-    @Prop({ required: true, unique: true })
-    email: string;
+  @Prop({ required: true, unique: true })
+  email: string;
 
-    @Prop({ required: true })
-    password: string;
+  @Prop({ required: true })
+  password: string;
 
-    @Prop()
-    token?: string;
+  @Prop()
+  token?: string;
 
-    @Prop({type: String, enum: Object.values(UserRole), default: UserRole.INVESTIGADOR, requiered: true})
-    role?: UserRole;
+  @Prop({
+    type: String,
+    enum: Object.values(UserRole),
+    default: UserRole.INVESTIGADOR,
+    requiered: true,
+  })
+  role?: UserRole;
+
+  @Prop({ default: true })
+  activo: boolean;
 }
-
 
 export const UsuarioSchema = SchemaFactory.createForClass(Usuario);

@@ -3,13 +3,17 @@ import { UserRole } from '../enums/user-role.enum';
 
 export class CreateAuthDto {
 
-  @IsEmail()
-  email: string;
+    @IsString()
+    @MinLength(3)
+    nombre: string;
 
-  @IsString()
-  @MinLength(6)
-  password: string;
+    @IsEmail()
+    email: string;
 
-  @IsEnum(UserRole)
-  role: UserRole;
+    @IsString()
+    @MinLength(6)
+    password: string;
+
+    @IsEnum(UserRole)
+    role: UserRole;
 }

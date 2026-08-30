@@ -38,7 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   const user = await this.usuarioModel.findById(payload.sub);
   const token = extractJwtFromRequest(req);
 
-  if (!user || !token || user.token !== token) {
+  if (!user ||user.activo === false ||!token || user.token !== token) {
     throw new UnauthorizedException();
   }
 

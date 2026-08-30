@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './Guards/jwt-auth.guard';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -8,6 +8,8 @@ import { RolesGuard } from './Guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { UserRole } from './enums/user-role.enum';
 import { CreateAuthDto } from './dto/create-auth.dto';
+import { UpdateUserStatusDto } from './dto/update-user-status.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -42,12 +44,12 @@ export class AuthController {
     };
   }
 
-  
+
   @Post('register')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async register(
-    @Body() body: CreateAuthDto, 
+    @Body() body: CreateAuthDto,
     @Req() req: Request) {
     this.authRateLimitService.assertAllowed('register', this.getRateLimitIdentifier(req, body.email));
     return this.authService.register(body);
@@ -102,5 +104,59 @@ export class AuthController {
       process.env.FRONTEND_ORIGIN?.startsWith('https://') === true
     );
   }
+
+  //metodo para servir lista de usuarios, solo accesible para administradores
+
+  @Get('users')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async findAllUsers() {
+    return this.authService.findAllUsers();
+  }
+
+  //metodo para actualizar el estado de un usuario, solo accesible para administradores
+
+  @Patch('users/:id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async UpdateUserStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+    @Req() req: any) {
+    if (
+      req.user.userId.toString() === id &&
+      dto.activo === false
+    ) {
+      throw new BadRequestException(
+        'No puedes desactivar tu propio usuario',
+      );
+    }
+    return this.authService.UpdateUserStatus(id, dto.activo);
+  }
+
+
+  //acutalizar nombre y rol del usuario, solo accesible para administradores
+
+  @Patch('users/:id')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
+async updateUser(
+  @Param('id') id: string,
+  @Body() dto: UpdateUserDto,
+  @Req() req: any,
+) {
+
+  if (
+    req.user.userId.toString() === id &&
+    dto.role !== undefined &&
+    dto.role !== UserRole.ADMIN
+  ) {
+    throw new BadRequestException(
+      'No puedes modificar tu propio rol de administrador',
+    );
+  }
+
+  return this.authService.updateUser(id, dto);
+}
 
 }
