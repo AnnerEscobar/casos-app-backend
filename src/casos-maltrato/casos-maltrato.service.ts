@@ -22,164 +22,163 @@ export class CasosMaltratoService {
   ) { }
 
 
-async create(
-  createCasosMaltratoDto: CreateCasosMaltratoDto,
-  file: Express.Multer.File,
-  usuario: {
-    userId: string;
-    role: UserRole;
-  }
-): Promise<CasosMaltrato> {
+  async create(
+    createCasosMaltratoDto: CreateCasosMaltratoDto,
+    file: Express.Multer.File,
+    usuario: {
+      userId: string;
+      role: UserRole;
+    }
+  ): Promise<CasosMaltrato> {
 
-  if (!file) {
-    throw new BadRequestException(
-      'El informe PDF es obligatorio para registrar el caso'
-    );
-  }
-
-  try {
-
-    const numeroDeic = assertValidCaseNumber(
-      'maltrato',
-      createCasosMaltratoDto.numeroDeic
-    );
-
-    const numeroMp = assertValidMaltratoMpNumber(
-      createCasosMaltratoDto.numeroMp
-    );
-
-
-    // Verificar duplicado antes de subir el PDF
-    const existingCaso =
-      await this.casoModel.findOne({
-        numeroDeic
-      });
-
-    if (existingCaso) {
+    if (!file) {
       throw new BadRequestException(
-        'El caso con este número DEIC ya está registrado. No se guardará el archivo.'
+        'El informe PDF es obligatorio para registrar el caso'
       );
     }
 
+    try {
 
-    // Estado según usuario que registra
-    let estadoRegistro: EstadoRegistro;
-
-    if (
-      usuario.role === UserRole.ANALISTA
-    ) {
-
-      estadoRegistro =
-        EstadoRegistro.APROBADO;
-
-    } else if (
-      usuario.role === UserRole.INVESTIGADOR
-    ) {
-
-      estadoRegistro =
-        EstadoRegistro.PENDIENTE;
-
-    } else {
-
-      throw new BadRequestException(
-        'Tu rol no tiene permitido registrar casos'
+      const numeroDeic = assertValidCaseNumber(
+        'maltrato',
+        createCasosMaltratoDto.numeroDeic
       );
 
-    }
-
-
-    // Subir PDF a Google Drive
-    const newFileName =
-      `${numeroDeic}${extname(file.originalname)}`;
-
-    const renamedFile = {
-      ...file,
-      originalname: newFileName,
-    };
-
-    const fileUrl =
-      await this.googleApiService.uploadFile(
-        renamedFile
+      const numeroMp = assertValidMaltratoMpNumber(
+        createCasosMaltratoDto.numeroMp
       );
 
 
-    // DTO V3
-    const {
-      sindicados,
-      victimas,
-      lugarHechos,
-      ...datosCaso
-    } = createCasosMaltratoDto;
+      // Verificar duplicado antes de subir el PDF
+      const existingCaso =
+        await this.casoModel.findOne({
+          numeroDeic
+        });
+
+      if (existingCaso) {
+        throw new BadRequestException(
+          'El caso con este número DEIC ya está registrado. No se guardará el archivo.'
+        );
+      }
 
 
-    const newCaso =
-      new this.casoModel({
+      // Estado según usuario que registra
+      let estadoRegistro: EstadoRegistro;
 
-        ...datosCaso,
+      if (
+        usuario.role === UserRole.ANALISTA
+      ) {
 
-        numeroDeic,
-        numeroMp,
+        estadoRegistro =
+          EstadoRegistro.APROBADO;
 
-        // V3 frontend/backend:
-        // sindicados
-        //
-        // Mongo histórico V2:
-        // infractores
-        infractores:
-          sindicados,
+      } else if (
+        usuario.role === UserRole.INVESTIGADOR
+      ) {
 
+        estadoRegistro =
+          EstadoRegistro.PENDIENTE;
+
+      } else {
+
+        throw new BadRequestException(
+          'Tu rol no tiene permitido registrar casos'
+        );
+
+      }
+
+
+      // Subir PDF a Google Drive
+      const newFileName =
+        `${numeroDeic}${extname(file.originalname)}`;
+
+      const renamedFile = {
+        ...file,
+        originalname: newFileName,
+      };
+
+      const fileUrl =
+        await this.googleApiService.uploadFile(
+          renamedFile
+        );
+
+
+      // DTO V3
+      const {
+        sindicados,
         victimas,
-
         lugarHechos,
-
-        // Mongo solo guarda la URL
-        fileUrls: [
-          fileUrl
-        ],
-
-        registradoPor:
-          new Types.ObjectId(
-            usuario.userId
-          ),
-
-        estadoRegistro,
-
-        revisadoPor: null,
-
-        fechaRevision: null,
-
-        motivoRechazo: null,
-
-      });
+        ...datosCaso
+      } = createCasosMaltratoDto;
 
 
-    return await newCaso.save();
+      const newCaso =
+        new this.casoModel({
 
-  } catch (error) {
+          ...datosCaso,
 
-    if (
-      error instanceof
-      BadRequestException
-    ) {
-      throw error;
-    }
+          numeroDeic,
+          numeroMp,
 
-    console.error(
-      'Error creando caso de maltrato:',
-      error
-    );
+          // V3 frontend/backend:
+          // sindicados
+          //
+          // Mongo histórico V2:
+          // infractores
+          infractores:
+            sindicados,
 
-    throw new BadRequestException(
-      `Error al crear el caso, ${
-        error instanceof Error
+          victimas,
+
+          lugarHechos,
+
+          // Mongo solo guarda la URL
+          fileUrls: [
+            fileUrl
+          ],
+
+          registradoPor:
+            new Types.ObjectId(
+              usuario.userId
+            ),
+
+          estadoRegistro,
+
+          revisadoPor: null,
+
+          fechaRevision: null,
+
+          motivoRechazo: null,
+
+        });
+
+
+      return await newCaso.save();
+
+    } catch (error) {
+
+      if (
+        error instanceof
+        BadRequestException
+      ) {
+        throw error;
+      }
+
+      console.error(
+        'Error creando caso de maltrato:',
+        error
+      );
+
+      throw new BadRequestException(
+        `Error al crear el caso, ${error instanceof Error
           ? error.message
           : String(error)
-      }`
-    );
+        }`
+      );
+
+    }
 
   }
-
-}
 
   async findAll(): Promise<CasosMaltratoDocument[]> {
 
@@ -209,6 +208,13 @@ async create(
   }
 
   async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File) {
+
+    if (!file) {
+      throw new BadRequestException(
+        'El documento de respaldo es obligatorio para registrar el seguimiento'
+      );
+    }
+
     const caso = await this.casoModel.findOne({ numeroDeic });
 
     if (!caso) {
@@ -410,9 +416,9 @@ async create(
         'revisadoPor',
         'nombre email role'
       ).populate(
-      'historialRevisiones.usuario',
-      'nombre email role'
-    )
+        'historialRevisiones.usuario',
+        'nombre email role'
+      )
       .sort({
         createdAt: -1
       })
@@ -482,11 +488,11 @@ async create(
 
 
     // Conservamos los archivos anteriores
-caso.fileUrls ??= [];
+    caso.fileUrls ??= [];
 
-caso.fileUrls.push(
-  fileUrl
-);
+    caso.fileUrls.push(
+      fileUrl
+    );
     caso.historialRevisiones ??= [];
 
     caso.historialRevisiones.push({

@@ -10,7 +10,7 @@ import {
   UploadedFile,
   UseGuards,
   Req,
-  ParseFilePipeBuilder
+  ParseFilePipeBuilder,
 } from '@nestjs/common';
 import { CasosMaltratoService } from './casos-maltrato.service';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
@@ -23,39 +23,33 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/auth/enums/user-role.enum';
 import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 
-
-
 @UseGuards(JwtAuthGuard)
 @Controller('maltratos')
 export class CasosMaltratoController {
-  constructor(private readonly casosMaltratoService: CasosMaltratoService) { }
+  constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
 
   @Post('crear-maltrato')
   @UseGuards(RolesGuard)
-  @Roles(
-    UserRole.ANALISTA,
-    UserRole.INVESTIGADOR
-  )
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
   @UseInterceptors(FileInterceptor('file'))
   async create(
     @Body() createCasosMaltratoDto: CreateCasosMaltratoDto,
     @UploadedFile(
-  new ParseFilePipeBuilder()
-    .addFileTypeValidator({
-      fileType: 'application/pdf'
-    })
-    .build({
-      fileIsRequired: true
-    })
-)
-file: Express.Multer.File,
-    @Req() req: any
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: 'application/pdf',
+        })
+        .build({
+          fileIsRequired: true,
+        }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
   ) {
-
     return this.casosMaltratoService.create(
       createCasosMaltratoDto,
       file,
-      req.user
+      req.user,
     );
   }
 
@@ -65,13 +59,34 @@ file: Express.Multer.File,
   }
 
   @Patch('seguimiento/:numeroDeic')
-  @UseInterceptors(FileInterceptor('file')) // Usa FilesInterceptor si quieres permitir varios
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
   async actualizarSeguimiento(
-    @Param('numeroDeic') numeroDeic: string,
-    @Body() body: { estadoInvestigacion: string },
-    @UploadedFile() file: Express.Multer.File
+    @Param('numeroDeic')
+    numeroDeic: string,
+
+    @Body()
+    body: {
+      estadoInvestigacion: string;
+    },
+
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: 'application/pdf',
+        })
+        .build({
+          fileIsRequired: true,
+        }),
+    )
+    file: Express.Multer.File,
   ) {
-    return this.casosMaltratoService.agregarSeguimiento(numeroDeic, body.estadoInvestigacion, file);
+    return this.casosMaltratoService.agregarSeguimiento(
+      numeroDeic,
+      body.estadoInvestigacion,
+      file,
+    );
   }
 
   @Get('buscar/:numeroDeic')
@@ -83,23 +98,14 @@ file: Express.Multer.File,
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
   async findPendientes() {
-
     return this.casosMaltratoService.findPendientes();
-
   }
 
   @Patch(':id/aprobar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
-  async aprobarRegistro(
-    @Param('id') id: string,
-    @Req() req: any
-  ) {
-
-    return this.casosMaltratoService.aprobarRegistro(
-      id,
-      req.user.userId
-    );
+  async aprobarRegistro(@Param('id') id: string, @Req() req: any) {
+    return this.casosMaltratoService.aprobarRegistro(id, req.user.userId);
   }
 
   @Patch(':id/rechazar-registro')
@@ -108,13 +114,12 @@ file: Express.Multer.File,
   async rechazarRegistro(
     @Param('id') id: string,
     @Body() dto: RechazarRegistroDto,
-    @Req() req: any
+    @Req() req: any,
   ) {
-
     return this.casosMaltratoService.rechazarRegistro(
       id,
       req.user.userId,
-      dto.motivo
+      dto.motivo,
     );
   }
 
@@ -122,15 +127,9 @@ file: Express.Multer.File,
   @Get('mis-registros')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
-  async findMisRegistros(
-    @Req() req: any
-  ) {
-
-    return this.casosMaltratoService.findMisRegistros(
-      req.user.userId
-    );
+  async findMisRegistros(@Req() req: any) {
+    return this.casosMaltratoService.findMisRegistros(req.user.userId);
   }
-
 
   @Patch(':id/reenviar-registro')
   @UseGuards(RolesGuard)
@@ -139,29 +138,25 @@ file: Express.Multer.File,
   async reenviarRegistro(
     @Param('id') id: string,
     @UploadedFile(
-  new ParseFilePipeBuilder()
-    .addFileTypeValidator({
-      fileType: 'application/pdf'
-    })
-    .build({
-      fileIsRequired: true
-    })
-)
-file: Express.Multer.File,
-    @Req() req: any
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: 'application/pdf',
+        })
+        .build({
+          fileIsRequired: true,
+        }),
+    )
+    file: Express.Multer.File,
+    @Req() req: any,
   ) {
-
-  
     return this.casosMaltratoService.reenviarRegistro(
       id,
       req.user.userId,
-      file
+      file,
     );
   }
 
-
   //casos sin implemententar
-
 
   @Get(':id')
   findOne(@Param('id') id: string) {
@@ -169,7 +164,10 @@ file: Express.Multer.File,
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCasosMaltratoDto: UpdateCasosMaltratoDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCasosMaltratoDto: UpdateCasosMaltratoDto,
+  ) {
     return this.casosMaltratoService.update(+id, updateCasosMaltratoDto);
   }
 
