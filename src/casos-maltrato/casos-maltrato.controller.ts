@@ -9,7 +9,8 @@ import {
   UseInterceptors,
   UploadedFile,
   UseGuards,
-  Req
+  Req,
+  ParseFilePipeBuilder
 } from '@nestjs/common';
 import { CasosMaltratoService } from './casos-maltrato.service';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
@@ -20,7 +21,7 @@ import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/Guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/auth/enums/user-role.enum';
-import { RechazarRegistroDto } from './dto/rechazar-registro.dto';
+import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 
 
 
@@ -38,7 +39,16 @@ export class CasosMaltratoController {
   @UseInterceptors(FileInterceptor('file'))
   async create(
     @Body() createCasosMaltratoDto: CreateCasosMaltratoDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+  new ParseFilePipeBuilder()
+    .addFileTypeValidator({
+      fileType: 'application/pdf'
+    })
+    .build({
+      fileIsRequired: true
+    })
+)
+file: Express.Multer.File,
     @Req() req: any
   ) {
 
@@ -128,10 +138,20 @@ export class CasosMaltratoController {
   @UseInterceptors(FileInterceptor('file'))
   async reenviarRegistro(
     @Param('id') id: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+  new ParseFilePipeBuilder()
+    .addFileTypeValidator({
+      fileType: 'application/pdf'
+    })
+    .build({
+      fileIsRequired: true
+    })
+)
+file: Express.Multer.File,
     @Req() req: any
   ) {
 
+  
     return this.casosMaltratoService.reenviarRegistro(
       id,
       req.user.userId,

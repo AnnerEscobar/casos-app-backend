@@ -1,72 +1,389 @@
-import { Optional } from '@nestjs/common';
-import { Schema, Prop, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import {
+  Prop,
+  Schema,
+  SchemaFactory
+} from '@nestjs/mongoose';
 
-export type CasosConflictoDocument = CasosConflicto & Document;
+import {
+  Document,
+  Types
+} from 'mongoose';
 
-// Subdocumento para infractores y víctimas
-@Schema({ _id: false, timestamps:true }) // No genera un _id independiente para cada subdocumento
+import {
+  EstadoRegistro
+} from '../../common/enums/estado-registro.enum';
 
+import {
+  TipoRevisionRegistro
+} from '../../common/enums/tipo-revision-registro.enum';
+
+
+export type CasosConflictoDocument =
+  CasosConflicto & Document;
+
+
+/* =========================================================
+   INFRACTORES Y VÍCTIMAS
+========================================================= */
+
+@Schema({
+  _id: false
+})
 export class VictimaInfractor {
 
-  @Prop({ required: true })
+  @Prop({
+    required: true
+  })
   nombre: string;
 
-  @Prop({ required: true })
+
+  @Prop({
+    required: true
+  })
   cui: string;
 
-  @Prop({ required: true })
+
+  @Prop({
+    required: true
+  })
   fecha_Nac: Date;
 
-  @Prop({ required: true })
+
+  @Prop({
+    required: true
+  })
   direccion: string;
+
 }
 
-// Subdocumento para seguimientos
-@Schema({ _id: false, timestamps: true })
+
+export const VictimaInfractorSchema =
+  SchemaFactory.createForClass(
+    VictimaInfractor
+  );
+
+
+/* =========================================================
+   LUGAR DE LOS HECHOS
+========================================================= */
+
+@Schema({
+  _id: false
+})
+export class LugarHechos {
+
+  @Prop({
+    required: true
+  })
+  departamento: string;
+
+
+  @Prop({
+    required: true
+  })
+  municipio: string;
+
+
+  @Prop({
+    required: true
+  })
+  direccionDetallada: string;
+
+}
+
+
+export const LugarHechosSchema =
+  SchemaFactory.createForClass(
+    LugarHechos
+  );
+
+
+/* =========================================================
+   SEGUIMIENTOS
+========================================================= */
+
+@Schema({
+  _id: false,
+  timestamps: true
+})
 export class Seguimiento {
-  @Prop({ default: Date.now })
+
+  @Prop({
+    default: Date.now
+  })
   fecha: Date;
 
-  @Prop({ required: true })
+
+  @Prop({
+    required: true
+  })
   estado: string;
 
-  @Prop({ type: [String], required: true })
+
+  @Prop({
+    type: [String],
+    default: []
+  })
   archivos: string[];
+
 }
 
-// Esquema principal
-@Schema({ timestamps: true }) // Agrega createdAt y updatedAt automáticamente
-export class CasosConflicto  extends Document {
+
+export const SeguimientoSchema =
+  SchemaFactory.createForClass(
+    Seguimiento
+  );
+
+
+/* =========================================================
+   HISTORIAL DE AUTORIZACIÓN
+========================================================= */
+
+@Schema({
+  _id: false
+})
+export class RevisionRegistroConflicto {
+
+  @Prop({
+    type: String,
+    enum: Object.values(
+      TipoRevisionRegistro
+    ),
+    required: true,
+  })
+  tipo: TipoRevisionRegistro;
+
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Usuario',
+    required: true,
+  })
+  usuario: Types.ObjectId;
+
+
+  @Prop({
+    type: Date,
+    default: Date.now,
+  })
+  fecha: Date;
+
+
+  @Prop({
+    type: String,
+    trim: true,
+    default: null,
+  })
+  observacion?: string | null;
+
+
+  @Prop({
+    type: String,
+    default: null,
+  })
+  archivoUrl?: string | null;
+
+}
+
+
+export const RevisionRegistroConflictoSchema =
+  SchemaFactory.createForClass(
+    RevisionRegistroConflicto
+  );
+
+
+/* =========================================================
+   ESQUEMA PRINCIPAL
+========================================================= */
+
+@Schema({
+  timestamps: true
+})
+export class CasosConflicto extends Document {
+
+
+  /* =========================
+     IDENTIFICADORES
+  ========================== */
+
   @Prop({
     required: true,
-    match: /^(?:DEIC53-\d{4}-\d{2}-\d{2}-\d+|AC\d{6})$/,
+    match:
+      /^(?:DEIC53-\d{4}-\d{2}-\d{2}-\d+|AC\d{6})$/,
   })
   numeroDeic: string;
 
+
   @Prop({
     required: true,
-    match: /^(?:M0004|MP001|MPE01)-\d{4}-\d+$/,
+    match:
+      /^(?:M0004|MP001|MPE01)-\d{4}-\d+$/,
   })
   numeroMp: string;
 
-  @Prop({ required: true })
+
+  /* =========================
+     ESTADO DE INVESTIGACIÓN
+  ========================== */
+
+  @Prop({
+    required: true
+  })
   estadoInvestigacion: string;
 
-  @Prop({ type: [VictimaInfractor], required: true })
-  infractores: VictimaInfractor[];
 
-  @Prop({ type: [VictimaInfractor], required: true })
-  victimas: VictimaInfractor[];
+  /* =========================
+     CONTROL DE REGISTRO
+     Y AUTORIZACIÓN
+  ========================== */
 
-  @Prop({ type: [String], required: Optional })
-  fileUrls: string[];
+  @Prop({
+    type: String,
+    enum: Object.values(
+      EstadoRegistro
+    ),
+    default:
+      EstadoRegistro.APROBADO,
+    required: true,
+  })
+  estadoRegistro:
+    EstadoRegistro;
 
-    @Prop({ type: [Seguimiento], default: [] })
-      seguimientos: Seguimiento[];
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Usuario',
+    default: null,
+  })
+  registradoPor?:
+    Types.ObjectId | null;
+
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Usuario',
+    default: null,
+  })
+  revisadoPor?:
+    Types.ObjectId | null;
+
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  fechaRevision?:
+    Date | null;
+
+
+  @Prop({
+    type: String,
+    default: null,
+    trim: true,
+  })
+  motivoRechazo?:
+    string | null;
+
+
+  @Prop({
+    type: [
+      RevisionRegistroConflictoSchema
+    ],
+    default: [],
+  })
+  historialRevisiones:
+    RevisionRegistroConflicto[];
+
+
+  /* =========================
+     INFRACTORES
+  ========================== */
+
+  @Prop({
+    type: [
+      VictimaInfractorSchema
+    ],
+    required: true,
+    default: []
+  })
+  infractores:
+    VictimaInfractor[];
+
+
+  /* =========================
+     VÍCTIMAS
+  ========================== */
+
+  @Prop({
+    type: [
+      VictimaInfractorSchema
+    ],
+    required: true,
+    default: []
+  })
+  victimas:
+    VictimaInfractor[];
+
+
+  /* =========================
+     LUGAR DE LOS HECHOS
+  ========================== */
+
+  /*
+   * Obligatorio en DTO V3.
+   *
+   * Opcional en Mongo porque los
+   * casos históricos V2 pueden
+   * no contener este campo.
+   */
+
+  @Prop({
+    type: LugarHechosSchema,
+    required: false,
+    default: null,
+  })
+  lugarHechos?:
+    LugarHechos | null;
+
+
+  /* =========================
+     DOCUMENTOS
+  ========================== */
+
+  /*
+   * Se almacenan únicamente
+   * las URLs de Google Drive.
+   */
+
+  @Prop({
+    type: [String],
+    default: [],
+  })
+  fileUrls:
+    string[];
+
+
+  /* =========================
+     SEGUIMIENTOS
+  ========================== */
+
+  @Prop({
+    type: [
+      SeguimientoSchema
+    ],
+    default: []
+  })
+  seguimientos:
+    Seguimiento[];
+
 }
 
-// Genera los esquemas
-export const VictimaInfractorSchema = SchemaFactory.createForClass(VictimaInfractor);
-export const SeguimientoSchema = SchemaFactory.createForClass(Seguimiento);
-export const CasosConflictoSchema = SchemaFactory.createForClass(CasosConflicto);
+
+/* =========================================================
+   SCHEMA PRINCIPAL
+========================================================= */
+
+export const CasosConflictoSchema =
+  SchemaFactory.createForClass(
+    CasosConflicto
+  );

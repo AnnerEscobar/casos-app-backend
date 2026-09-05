@@ -1,13 +1,26 @@
-import { IsString, IsNotEmpty, IsOptional, IsDate, IsObject, Matches, IsEmpty, IsArray, ArrayNotEmpty } from 'class-validator';
-import { Type } from 'class-transformer';
-import { Prop } from '@nestjs/mongoose';
+import { plainToInstance, Transform, Type } from 'class-transformer';
+
+import {
+    IsDate,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    Matches,
+    ValidateNested
+} from 'class-validator';
+
+import { LugarDesaparicionDto } from './lugar-desaparicion.dto';
+import { DenuncianteDto } from './denunciante.dto';
+import { DatosLocalizacionDto } from './datos-localizacion.dto';
+
 
 export class CreateCasosAlertaDto {
 
     @IsString()
     @IsNotEmpty()
     @Matches(/^DEIC52-\d{4}-\d{2}-\d{2}-\d+$/, {
-        message: 'El numero Deic debe seguir el formato DEIC52-AAAA-MM-DD-XXX'
+        message:
+            'El numero Deic debe seguir el formato DEIC52-AAAA-MM-DD-XXX'
     })
     numeroDeic: string;
 
@@ -15,7 +28,8 @@ export class CreateCasosAlertaDto {
     @IsString()
     @IsNotEmpty()
     @Matches(/^M0030-\d{4}-\d+$/, {
-        message: 'El numero Mp debe seguir el formato M0030-AAAA-XXX'
+        message:
+            'El numero Mp debe seguir el formato M0030-AAAA-XXX'
     })
     numeroMp: string;
 
@@ -23,10 +37,13 @@ export class CreateCasosAlertaDto {
     @IsString()
     @IsNotEmpty()
     @Matches(/^\d+-\d{4}$/, {
-        message: 'El numero de alerta, debe seguir el formato XXXX-AAAA'
+        message:
+            'El numero de alerta debe seguir el formato XXXX-AAAA'
     })
     numeroAlerta: string;
 
+
+    // DESAPARECIDO
 
     @IsString()
     @IsNotEmpty()
@@ -42,61 +59,71 @@ export class CreateCasosAlertaDto {
     @IsNotEmpty()
     estadoInvestigacion: string;
 
+
+    // DENUNCIANTE
+
+    @Transform(({ value }) => {
+
+  const parsed =
+    typeof value === 'string'
+      ? JSON.parse(value)
+      : value;
+
+  return plainToInstance(
+    DenuncianteDto,
+    parsed
+  );
+})
+@ValidateNested()
+denunciante: DenuncianteDto;
+
+
+    // LUGAR DE LA DESAPARICIÓN
+
+    @Transform(({ value }) => {
+
+  const parsed =
+    typeof value === 'string'
+      ? JSON.parse(value)
+      : value;
+
+  return plainToInstance(
+    LugarDesaparicionDto,
+    parsed
+  );
+})
+@ValidateNested()
+lugarDesaparicion: LugarDesaparicionDto;
+
+
     @IsOptional()
     @IsString()
     origenAlerta?: string;
 
+
     @IsOptional()
     @IsString()
     casaHogar?: string;
+
 
     @IsOptional()
     @IsString()
     ubicacionGps?: string;
 
 
-    @IsObject()
-    direccion: {
-        departamento: string;
-        municipio: string;
-        direccionDetallada: string;
-    };
+   @IsOptional()
+@Transform(({ value }) => {
 
-     @IsArray()
-    @IsOptional()
-    @IsString({ each: true })
-    fileUrls: string[];
+  const parsed =
+    typeof value === 'string'
+      ? JSON.parse(value)
+      : value;
 
-    @IsOptional()
-    @IsString()
-    direccionLocalizacion?: string;
-
-    @IsOptional()
-    @IsString()
-    nombreAcompanante?: string;
-
-    @IsOptional()
-    @IsString()
-    telefono?: string;
-
-    @IsOptional()
-    @IsString()
-    horaLocalizacion?: string;
-
-    @IsOptional()
-    @IsDate()
-    @Type(() => Date)
-    fechaLocalizacion?: Date;
-
-    seguimientos?: {
-        nuevoEstado: string;
-        fecha: Date;
-        nombreAcompanante?: string;
-        telefono?: string;
-        direccionLocalizacion?: string;
-        horaLocalizacion?: string;
-        fechaLocalizacion?: Date;
-        archivos: string[];
-      }[];
-
+  return plainToInstance(
+    DatosLocalizacionDto,
+    parsed
+  );
+})
+@ValidateNested()
+datosLocalizacion?: DatosLocalizacionDto;
 }
