@@ -11,6 +11,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class AuthService {
+  investigadores() {
+    return this.usuarioModel.find({ role: UserRole.INVESTIGADOR })
+      .select('_id nombre role activo').sort({ nombre: 1 }).lean().exec();
+  }
 
   constructor(
     @InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>,

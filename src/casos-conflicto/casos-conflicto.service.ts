@@ -1,3 +1,7 @@
+import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
+import { CreateHistoricoConflictoDto } from './dto/create-historico-conflicto.dto';
+import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
+import { normalizeCaseNumber } from '../common/case-number.validator';
 import { GoogleApiService } from 'src/google-api/google-api.service';
 import {
   BadRequestException,
@@ -18,6 +22,16 @@ import { UserRole } from 'src/auth/enums/user-role.enum';
 
 @Injectable()
 export class CasosConflictoService {
+
+  async incorporarHistorico(dto: CreateHistoricoConflictoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
+    return incorporarHistorico(this.casoModel, 'conflicto', dto, dto, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
+  }
+
+
+  private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
+    const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
+    return this.googleApiService.uploadFile(renamedFile);
+  }
 
   constructor(
     @InjectModel(CasosConflicto.name) 
@@ -86,24 +100,7 @@ async create(
 
 
     // Subir archivo
-    let fileUrl: string | null = null;
-
-    if (file) {
-
-      const newFileName =
-        `${numeroDeic}${extname(file.originalname)}`;
-
-      const renamedFile = {
-        ...file,
-        originalname: newFileName,
-      };
-
-      fileUrl =
-        await this.googleApiService.uploadFile(
-          renamedFile
-        );
-    }
-
+    const fileUrl = file ? await this.subirDocumentoCaso(file, numeroDeic) : null;
 
     const newCaso = new this.casoModel({
 
@@ -178,17 +175,22 @@ async create(
 }
 
   
-  async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File) {
+  async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
+    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
     const caso = await this.casoModel.findOne({ numeroDeic });
   
     if (!caso) {
       throw new NotFoundException('Caso no encontrado');
     }
+    validarSeguimientoAbierto('conflicto', caso);
+    const cantidadAnterior = caso.seguimientos?.length ?? 0;
+    validarResponsableHistorico(caso, auditoria);
    // ID de la carpeta de Conflictos en Drive
     let fileUrl: string | null = null;
   
     if (file) {
-      const numeroSeguimiento = caso.seguimientos.length + 1;
+      const numeroSeguimiento = (caso.seguimientos?.length ?? 0) + 1;
       const newFileName = `Seguimiento(${numeroSeguimiento})-${numeroDeic}${extname(file.originalname)}`;
       const renamedFile = {
         ...file,
@@ -198,23 +200,27 @@ async create(
     }
   
     const seguimiento = {
+      ...auditoria,
       fecha: new Date(),
       estado,
       archivos: fileUrl ? [fileUrl] : [],
     };
   
+    caso.seguimientos ??= [];
     caso.seguimientos.push(seguimiento);
     caso.estadoInvestigacion = estado;
     console.log('Subiendo archivo a carpeta de pruebas...');
-    await caso.save();
+    await guardarSeguimiento(caso, cantidadAnterior);
+    await poblarUsuariosSeguimientos(caso);
     console.log('Archivo subido con éxito:');
-    return { mensaje: 'Seguimiento agregado correctamente', seguimiento };
+    return { mensaje: 'Seguimiento agregado correctamente', seguimiento: caso.seguimientos[caso.seguimientos.length - 1] };
   }
   
   
 async buscarPorNumeroDeic(
   numeroDeic: string
 ): Promise<CasosConflictoDocument> {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
 
   const caso = await this.casoModel.findOne({
 
@@ -239,7 +245,14 @@ async buscarPorNumeroDeic(
     );
   }
 
-  return caso;
+  if (caso.origenCaso === 'HISTORICO') {
+    await caso.populate([
+      { path: 'registradoPor', select: 'nombre' },
+      { path: 'investigadorOriginal.usuarioId', select: 'nombre' },
+    ]);
+  }
+  await poblarUsuariosSeguimientos(caso);
+    return caso;
 }
 
 async findPendientes(): Promise<CasosConflictoDocument[]> {

@@ -1,3 +1,5 @@
+import { CreateHistoricoConflictoDto } from './dto/create-historico-conflicto.dto';
+import { SeguimientoDto } from '../common/dto/seguimiento.dto';
 import {
   Body,
   Controller,
@@ -42,6 +44,20 @@ export class CasosConflictoController {
   // CREAR CASO DE CONFLICTO
   // Analista / Investigador
   // ─────────────────────────────────────────────
+
+  @Post('historico')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  async incorporarHistorico(
+    @Body() dto: CreateHistoricoConflictoDto,
+    @Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder()
+      .addFileTypeValidator({ fileType: 'application/pdf' })
+      .build({ fileIsRequired: false })) file?: Express.Multer.File,
+  ) {
+    return this.casosConflictoService.incorporarHistorico(dto, req.user, file);
+  }
 
   @Post('crear-conflicto')
   @UseGuards(RolesGuard)
@@ -166,17 +182,18 @@ export class CasosConflictoController {
     @Param('numeroDeic') numeroDeic: string,
 
     @Body()
-    body: {
-      estadoInvestigacion: string;
-    },
+    body: SeguimientoDto,
 
     @UploadedFile()
     file: Express.Multer.File,
+    @Req() req: any,
   ) {
     return this.casosConflictoService.agregarSeguimiento(
       numeroDeic,
       body.estadoInvestigacion,
       file,
+      req.user,
+      body.investigadorAsignado,
     );
   }
 

@@ -22,7 +22,7 @@ const maltratoMpPattern = /^(?:(?:MPE01|M0008|MP004|M0030|MP001)-\d{4}-\d+|IC\/P
 const maltratoMpHelp = 'Formato MP permitido para maltrato: MPE01-AAAA-###, M0008-AAAA-###, IC/PNCORLLAT###-AAAA-###, MP004-AAAA-###, M0030-AAAA-### o MP001-AAAA-###';
 
 export const normalizeCaseNumber = (numero: string): string => {
-  return numero.trim().toUpperCase();
+  return numero.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '').trim().toUpperCase();
 };
 
 export const isValidCaseNumber = (tipo: TipoCasoNumero, numero: string): boolean => {
@@ -55,7 +55,7 @@ export const caratulaTipoToCaseNumberTipo = (tipoCaso: string): TipoCasoNumero =
 };
 
 export const normalizeMpNumber = (numeroMp: string): string => {
-  return numeroMp.trim().toUpperCase();
+  return normalizeCaseNumber(numeroMp);
 };
 
 export const isValidConflictoMpNumber = (numeroMp: string): boolean => {

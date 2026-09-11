@@ -10,6 +10,7 @@ import { BusquedasModule } from './busquedas/busquedas.module';
 import { AuthModule } from './auth/auth.module';
 import { CaratulasModule } from './caratulas/caratulas.module';
 import { InformesModule } from './informes/informes.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { InformesModule } from './informes/informes.module';
     AuthModule,
     CaratulasModule,
     InformesModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

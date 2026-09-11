@@ -1,3 +1,4 @@
+import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import {
   Prop,
   Schema,
@@ -93,15 +94,13 @@ export class CasosAlerta {
 
 
   @Prop({
-    required: true,
-    unique: true
+    required: true
   })
   numeroMp: string;
 
 
   @Prop({
-    required: true,
-    unique: true
+    required: true
   })
   numeroAlerta: string;
 
@@ -287,6 +286,8 @@ export class CasosAlerta {
   })
   seguimientos?: {
 
+    registradoPor?: Types.ObjectId;
+    investigadorAsignado?: Types.ObjectId;
     nuevoEstado: string;
 
     fecha: Date;
@@ -311,3 +312,7 @@ export const CasosAlertaSchema =
   SchemaFactory.createForClass(
     CasosAlerta
   );
+export interface CasosAlerta extends MetadatosCasoHistorico {}
+configurarCasoHistorico(CasosAlertaSchema, ["numeroMp","numeroAlerta","nombreDesaparecido","fecha_Nac","estadoInvestigacion","direccion"]);
+CasosAlertaSchema.index({ numeroMp: 1 }, { unique: true, partialFilterExpression: { numeroMp: { $type: 'string' } } });
+CasosAlertaSchema.index({ numeroAlerta: 1 }, { unique: true, partialFilterExpression: { numeroAlerta: { $type: 'string' } } });

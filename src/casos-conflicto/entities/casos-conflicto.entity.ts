@@ -1,3 +1,4 @@
+import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import {
   Prop,
   Schema,
@@ -107,6 +108,12 @@ export const LugarHechosSchema =
   timestamps: true
 })
 export class Seguimiento {
+  @Prop({ type: Types.ObjectId, ref: 'Usuario' })
+  registradoPor?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Usuario' })
+  investigadorAsignado?: Types.ObjectId;
+
 
   @Prop({
     default: Date.now
@@ -387,3 +394,6 @@ export const CasosConflictoSchema =
   SchemaFactory.createForClass(
     CasosConflicto
   );
+export interface CasosConflicto extends MetadatosCasoHistorico {}
+configurarCasoHistorico(CasosConflictoSchema, ["numeroMp","estadoInvestigacion"]);
+CasosConflictoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

@@ -1,3 +1,4 @@
+import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
 import {
   Body,
   Controller,
@@ -46,6 +47,20 @@ export class CasosAlertaController {
   // Solo Analista / Investigador
   // PDF obligatorio
   // ─────────────────────────────────────────────
+
+  @Post('historico')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  async incorporarHistorico(
+    @Body() dto: CreateHistoricoAlertaDto,
+    @Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder()
+      .addFileTypeValidator({ fileType: 'application/pdf' })
+      .build({ fileIsRequired: false })) file?: Express.Multer.File,
+  ) {
+    return this.casosAlertaService.incorporarHistorico(dto, req.user, file);
+  }
 
   @Post('crear-alerta')
   @UseGuards(RolesGuard)
@@ -246,14 +261,16 @@ export class CasosAlertaController {
   async actualizarCasoAlerta(
     @Param('numeroDeic') numeroDeic: string,
     @Body() dto: UpdateCasosAlertaDto,
-    @UploadedFiles() files: Express.Multer.File[]
+    @UploadedFiles() files: Express.Multer.File[],
+    @Req() req: any
   ) {
 
     return this.casosAlertaService
       .actualizarCasoConSeguimiento(
         numeroDeic,
         dto,
-        files
+        files,
+        req.user
       );
   }
 }

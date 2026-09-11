@@ -1,3 +1,4 @@
+import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import {
   Prop,
   Schema,
@@ -162,6 +163,12 @@ export const LugarHechosSchema =
   timestamps: true
 })
 export class Seguimiento {
+  @Prop({ type: Types.ObjectId, ref: 'Usuario' })
+  registradoPor?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Usuario' })
+  investigadorAsignado?: Types.ObjectId;
+
 
   @Prop({
     default: Date.now
@@ -206,7 +213,7 @@ export class CasosMaltrato extends Document {
   @Prop({
     required: true,
     match:
-      /^DEIC51-\d{4}-\d{2}-\d{2}-\d+$/,
+      /^(?:DEIC51-\d{4}-\d{2}-\d{2}-\d+|MT\d{6})$/,
   })
   numeroDeic: string;
 
@@ -400,3 +407,6 @@ export const CasosMaltratoSchema =
   SchemaFactory.createForClass(
     CasosMaltrato
   );
+export interface CasosMaltrato extends MetadatosCasoHistorico {}
+configurarCasoHistorico(CasosMaltratoSchema, ["numeroMp","estadoInvestigacion"]);
+CasosMaltratoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

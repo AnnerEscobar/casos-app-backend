@@ -13,6 +13,13 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('auth')
 export class AuthController {
+  @Get('investigadores')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  async investigadores() {
+    return this.authService.investigadores();
+  }
+
   constructor(
     private readonly authService: AuthService,
     private readonly authRateLimitService: AuthRateLimitService,

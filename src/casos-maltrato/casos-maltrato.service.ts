@@ -1,3 +1,7 @@
+import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
+import { CreateHistoricoMaltratoDto } from './dto/create-historico-maltrato.dto';
+import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
+import { normalizeCaseNumber } from '../common/case-number.validator';
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
@@ -14,6 +18,17 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosMaltratoService {
+
+  async incorporarHistorico(dto: CreateHistoricoMaltratoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
+    const { sindicados, ...datos } = dto;
+    return incorporarHistorico(this.casoModel, 'maltrato', dto, { ...datos, infractores: sindicados }, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
+  }
+
+
+  private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
+    const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
+    return this.googleApiService.uploadFile(renamedFile);
+  }
 
   constructor(
     @InjectModel(CasosMaltrato.name)
@@ -89,19 +104,7 @@ export class CasosMaltratoService {
 
 
       // Subir PDF a Google Drive
-      const newFileName =
-        `${numeroDeic}${extname(file.originalname)}`;
-
-      const renamedFile = {
-        ...file,
-        originalname: newFileName,
-      };
-
-      const fileUrl =
-        await this.googleApiService.uploadFile(
-          renamedFile
-        );
-
+      const fileUrl = await this.subirDocumentoCaso(file, numeroDeic);
 
       // DTO V3
       const {
@@ -207,24 +210,26 @@ export class CasosMaltratoService {
     }
   }
 
-  async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File) {
-
-    if (!file) {
-      throw new BadRequestException(
-        'El documento de respaldo es obligatorio para registrar el seguimiento'
-      );
-    }
+  async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
+    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
 
     const caso = await this.casoModel.findOne({ numeroDeic });
 
     if (!caso) {
       throw new NotFoundException('Caso no encontrado');
     }
+    validarSeguimientoAbierto('maltrato', caso);
+    if (!file) {
+      throw new BadRequestException('El documento de respaldo es obligatorio para registrar el seguimiento');
+    }
+    const cantidadAnterior = caso.seguimientos?.length ?? 0;
+    validarResponsableHistorico(caso, auditoria);
     // ID de la carpeta de Maltrato en Drive
     let fileUrl: string | null = null;
 
     if (file) {
-      const numeroSeguimiento = caso.seguimientos.length + 1;
+      const numeroSeguimiento = (caso.seguimientos?.length ?? 0) + 1;
       const newFileName = `Seguimiento(${numeroSeguimiento})-${numeroDeic}${extname(file.originalname)}`;
       const renamedFile = {
         ...file,
@@ -234,23 +239,27 @@ export class CasosMaltratoService {
     }
 
     const seguimiento = {
+      ...auditoria,
       fecha: new Date(),
       estado,
       archivos: fileUrl ? [fileUrl] : [],
     };
 
+    caso.seguimientos ??= [];
     caso.seguimientos.push(seguimiento);
     caso.estadoInvestigacion = estado;
     console.log('Subiendo archivo a carpeta de pruebas...');
-    await caso.save();
+    await guardarSeguimiento(caso, cantidadAnterior);
+    await poblarUsuariosSeguimientos(caso);
     console.log('Archivo subido con éxito:');
-    return { mensaje: 'Seguimiento agregado correctamente', seguimiento };
+    return { mensaje: 'Seguimiento agregado correctamente', seguimiento: caso.seguimientos[caso.seguimientos.length - 1] };
   }
 
 
   async buscarPorNumeroDeic(
     numeroDeic: string
   ): Promise<CasosMaltratoDocument> {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
 
     const caso = await this.casoModel.findOne({
 
@@ -276,6 +285,13 @@ export class CasosMaltratoService {
       );
     }
 
+    if (caso.origenCaso === 'HISTORICO') {
+      await caso.populate([
+        { path: 'registradoPor', select: 'nombre' },
+        { path: 'investigadorOriginal.usuarioId', select: 'nombre' },
+      ]);
+    }
+    await poblarUsuariosSeguimientos(caso);
     return caso;
   }
 

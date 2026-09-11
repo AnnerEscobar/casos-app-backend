@@ -1,3 +1,5 @@
+import { CreateHistoricoMaltratoDto } from './dto/create-historico-maltrato.dto';
+import { SeguimientoDto } from '../common/dto/seguimiento.dto';
 import {
   Controller,
   Get,
@@ -27,6 +29,20 @@ import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 @Controller('maltratos')
 export class CasosMaltratoController {
   constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
+
+  @Post('historico')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  async incorporarHistorico(
+    @Body() dto: CreateHistoricoMaltratoDto,
+    @Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder()
+      .addFileTypeValidator({ fileType: 'application/pdf' })
+      .build({ fileIsRequired: false })) file?: Express.Multer.File,
+  ) {
+    return this.casosMaltratoService.incorporarHistorico(dto, req.user, file);
+  }
 
   @Post('crear-maltrato')
   @UseGuards(RolesGuard)
@@ -67,9 +83,7 @@ export class CasosMaltratoController {
     numeroDeic: string,
 
     @Body()
-    body: {
-      estadoInvestigacion: string;
-    },
+    body: SeguimientoDto,
 
     @UploadedFile(
       new ParseFilePipeBuilder()
@@ -81,11 +95,14 @@ export class CasosMaltratoController {
         }),
     )
     file: Express.Multer.File,
+    @Req() req: any,
   ) {
     return this.casosMaltratoService.agregarSeguimiento(
       numeroDeic,
       body.estadoInvestigacion,
       file,
+      req.user,
+      body.investigadorAsignado,
     );
   }
 

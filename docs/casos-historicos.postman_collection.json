@@ -1,0 +1,192 @@
+{
+  "info": {
+    "name": "V3 - Casos históricos",
+    "description": "Configurar token e investigadorId. Seleccionar PDF en el seguimiento de Maltrato. Preparar índices en la base de pruebas antes de ejecutar. Las peticiones crean datos al ejecutarse.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "investigadorId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Incorporar alerta sin expediente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/alertas/historico",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"numeroDeic\": \"DEIC52-2016-05-18-421\",\n  \"origenCaso\": \"HISTORICO\",\n  \"estadoExpedienteHistorico\": \"NO_LOCALIZADO\",\n  \"fuenteInformacionHistorica\": \"NUEVO_REQUERIMIENTO\",\n  \"observacionHistorica\": \"Expediente original no localizado.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Buscar alerta aprobado",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/alertas/by-deic/DEIC52-2016-05-18-421"
+      }
+    },
+    {
+      "name": "Seguimiento alerta",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/alertas/seguimiento/DEIC52-2016-05-18-421",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nuevoEstado\": \"En investigación\",\n  \"investigadorAsignado\": \"{{investigadorId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Incorporar maltrato sin expediente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/maltratos/historico",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"numeroDeic\": \"DEIC51-2016-05-18-421\",\n  \"origenCaso\": \"HISTORICO\",\n  \"estadoExpedienteHistorico\": \"NO_LOCALIZADO\",\n  \"fuenteInformacionHistorica\": \"NUEVO_REQUERIMIENTO\",\n  \"observacionHistorica\": \"Expediente original no localizado.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Buscar maltrato aprobado",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/maltratos/buscar/DEIC51-2016-05-18-421"
+      }
+    },
+    {
+      "name": "Seguimiento maltrato (seleccionar PDF en file)",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/maltratos/seguimiento/DEIC51-2016-05-18-421",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "estadoInvestigacion",
+              "value": "En investigación",
+              "type": "text"
+            },
+            {
+              "key": "investigadorAsignado",
+              "value": "{{investigadorId}}",
+              "type": "text"
+            },
+            {
+              "key": "file",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Incorporar conflicto sin expediente",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/conflictos/historico",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"numeroDeic\": \"DEIC53-2016-05-18-421\",\n  \"origenCaso\": \"HISTORICO\",\n  \"estadoExpedienteHistorico\": \"NO_LOCALIZADO\",\n  \"fuenteInformacionHistorica\": \"NUEVO_REQUERIMIENTO\",\n  \"observacionHistorica\": \"Expediente original no localizado.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Buscar conflicto aprobado",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/conflictos/buscar/DEIC53-2016-05-18-421"
+      }
+    },
+    {
+      "name": "Seguimiento conflicto",
+      "request": {
+        "method": "PATCH",
+        "url": "{{baseUrl}}/conflictos/seguimiento/DEIC53-2016-05-18-421",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"estadoInvestigacion\": \"En investigación\",\n  \"investigadorAsignado\": \"{{investigadorId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

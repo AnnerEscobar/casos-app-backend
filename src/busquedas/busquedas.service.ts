@@ -9,6 +9,7 @@ import { CasosConflicto, CasosConflictoDocument } from 'src/casos-conflicto/enti
 import { PipelineStage } from 'mongoose';
 
 
+
 @Injectable()
 export class BusquedasService {
 

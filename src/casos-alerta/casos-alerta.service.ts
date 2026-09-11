@@ -1,3 +1,7 @@
+import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
+import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
+import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
+import { normalizeCaseNumber, normalizeMpNumber } from '../common/case-number.validator';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
@@ -13,6 +17,29 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosAlertaService {
+
+  async incorporarHistorico(dto: CreateHistoricoAlertaDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
+    const { lugarDesaparicion, datosLocalizacion, ...datos } = dto;
+    return incorporarHistorico(this.casosAlertaModel, 'alerta', dto, {
+      ...datos, direccion: lugarDesaparicion,
+      direccionLocalizacion: datosLocalizacion?.direccionLocalizacion,
+      nombreAcompanante: datosLocalizacion?.nombrePersonaConQuienEstaba,
+      telefono: datosLocalizacion?.telefono,
+      horaLocalizacion: datosLocalizacion?.horaLocalizacion,
+      fechaLocalizacion: datosLocalizacion?.fechaLocalizacion,
+    }, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
+  }
+
+
+  private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
+    const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
+    const uploadedUrl = await this.googleApiService.uploadFile(renamedFile);
+    const extractedFileId = uploadedUrl.match(/id=([^&]+)/)?.[1];
+    if (!extractedFileId) {
+      throw new BadRequestException('No se pudo extraer el ID del archivo de Google Drive.');
+    }
+    return `https://drive.google.com/uc?export=download&id=${extractedFileId}`;
+  }
 
   constructor(
     @InjectModel(CasosAlerta.name)
@@ -75,37 +102,7 @@ export class CasosAlertaService {
 
 
       // Subir archivo
-      let fileUrl: string | null = null;
-
-      if (file) {
-
-        const newFileName =
-          `${numeroDeic}${extname(file.originalname)}`;
-
-        const renamedFile = {
-          ...file,
-          originalname: newFileName,
-        };
-
-        const uploadedUrl =
-          await this.googleApiService.uploadFile(renamedFile);
-
-        const fileIdRegex = /id=([^&]+)/;
-        const match = uploadedUrl.match(fileIdRegex);
-
-        const extractedFileId =
-          match ? match[1] : null;
-
-        if (!extractedFileId) {
-          throw new BadRequestException(
-            'No se pudo extraer el ID del archivo de Google Drive.'
-          );
-        }
-
-        fileUrl =
-          `https://drive.google.com/uc?export=download&id=${extractedFileId}`;
-      }
-
+      const fileUrl = file ? await this.subirDocumentoCaso(file, numeroDeic) : null;
 
       /*
        * Extraemos los campos V3 que necesitan
@@ -214,6 +211,7 @@ export class CasosAlertaService {
   async buscarPorNumeroMp(
     numeroMp: string
   ): Promise<CasosAlerta[]> {
+    numeroMp = normalizeMpNumber(numeroMp);
 
     const alertas = await this.casosAlertaModel.find({
 
@@ -250,16 +248,22 @@ export class CasosAlertaService {
     numeroDeic: string,
     dto: UpdateCasosAlertaDto,
     files: Express.Multer.File[],
+    usuario: UsuarioSesion,
   ) {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
+    const auditoria = await auditoriaSeguimiento(this.casosAlertaModel, usuario, dto.investigadorAsignado);
     const caso = await this.casosAlertaModel.findOne({ numeroDeic });
 
     if (!caso) {
       throw new NotFoundException('Caso de alerta no encontrado');
     }
+    validarSeguimientoAbierto('alerta', caso);
+    const cantidadAnterior = caso.seguimientos?.length ?? 0;
+    validarResponsableHistorico(caso, auditoria);
 
     // Subir archivos de seguimiento
     const fileUrls = await Promise.all(
-      files.map((file, index) => {
+      (files ?? []).map((file, index) => {
         const nombre = `Seguimiento(${index + 1})-${numeroDeic}${extname(file.originalname)}`;
         const renamed = { ...file, originalname: nombre };
         return this.googleApiService.uploadFile(renamed);
@@ -269,6 +273,7 @@ export class CasosAlertaService {
 
     // Construir objeto seguimiento
     const seguimiento = {
+      ...auditoria,
       nuevoEstado: dto.nuevoEstado,
       fecha: new Date(),
       nombreAcompanante: dto.nombreAcompanante,
@@ -279,9 +284,9 @@ export class CasosAlertaService {
       archivos: fileUrls,
     };
 
-    caso.estadoInvestigacion = dto.nuevoEstado;
+    if (dto.nuevoEstado !== undefined) caso.estadoInvestigacion = dto.nuevoEstado;
 
-    caso.seguimientos = caso.seguimientos || [];
+    caso.seguimientos ??= [];
     caso.seguimientos.push(seguimiento);
 
     console.log('Seguimientos antes de guardar:', caso.seguimientos);
@@ -290,13 +295,15 @@ export class CasosAlertaService {
 
 
     caso.markModified('seguimientos');
-    await caso.save();
-    return { message: 'Seguimiento agregado correctamente', seguimiento };
+    await guardarSeguimiento(caso, cantidadAnterior);
+    await poblarUsuariosSeguimientos(caso);
+    return { message: 'Seguimiento agregado correctamente', seguimiento: caso.seguimientos[caso.seguimientos.length - 1] };
   }
 
   async buscarPorNumeroDeic(
     numeroDeic: string
   ): Promise<CasosAlerta> {
+    numeroDeic = normalizeCaseNumber(numeroDeic);
 
     const caso = await this.casosAlertaModel.findOne({
 
@@ -321,6 +328,13 @@ export class CasosAlertaService {
       );
     }
 
+    if (caso.origenCaso === 'HISTORICO') {
+      await caso.populate([
+        { path: 'registradoPor', select: 'nombre' },
+        { path: 'investigadorOriginal.usuarioId', select: 'nombre' },
+      ]);
+    }
+    await poblarUsuariosSeguimientos(caso);
     return caso;
   }
 
