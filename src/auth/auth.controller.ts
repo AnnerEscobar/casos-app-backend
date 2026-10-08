@@ -62,11 +62,7 @@ export class AuthController {
     return this.authService.register(body);
   }
 
-  @Post('recover-password')
-  recoverPassword(@Body() body: { email: string }, @Req() req: Request) {
-    this.authRateLimitService.assertAllowed('recover-password', this.getRateLimitIdentifier(req, body.email));
-    return { message: 'Si la cuenta existe, se iniciara el proceso de recuperacion.' };
-  }
+
 
   @UseGuards(JwtAuthGuard)
   @Get('session')

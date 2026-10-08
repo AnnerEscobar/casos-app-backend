@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 
-type AuthAction = 'login' | 'register' | 'recover-password';
+type AuthAction = 'login' | 'register';
 
 interface AttemptState {
   count: number;
@@ -15,7 +15,6 @@ export class AuthRateLimitService {
   private readonly limits: Record<AuthAction, number> = {
     login: 5,
     register: 3,
-    'recover-password': 3,
   };
 
   assertAllowed(action: AuthAction, identifier: string): void {

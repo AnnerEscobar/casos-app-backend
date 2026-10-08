@@ -11,6 +11,9 @@ import { AuthModule } from './auth/auth.module';
 import { CaratulasModule } from './caratulas/caratulas.module';
 import { InformesModule } from './informes/informes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import {
+  DocumentacionInicialModule,
+} from './documentacion-inicial/documentacion-inicial.module';
 
 @Module({
   imports: [
@@ -26,6 +29,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     CaratulasModule,
     InformesModule,
     DashboardModule,
+    DocumentacionInicialModule,
   ],
   controllers: [],
   providers: [],

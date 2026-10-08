@@ -1,3 +1,5 @@
+import { BusquedaAccesoService } from './busqueda-acceso.service';
+import { SolicitudAcceso, SolicitudAccesoSchema } from './solicitud-acceso.schema';
 import { Module } from '@nestjs/common';
 import { BusquedasService } from './busquedas.service';
 import { BusquedasController } from './busquedas.controller';
@@ -8,9 +10,10 @@ import { CasosAlerta, CasosAlertaSchema } from 'src/casos-alerta/entities/casos-
 
 @Module({
   controllers: [BusquedasController],
-  providers: [BusquedasService],
+  providers: [BusquedasService, BusquedaAccesoService],
   imports: [
     MongooseModule.forFeature([
+      { name: SolicitudAcceso.name, schema: SolicitudAccesoSchema },
       { name: CasosAlerta.name, schema: CasosAlertaSchema },
       { name: CasosMaltrato.name, schema: CasosMaltratoSchema },
       { name: CasosConflicto.name, schema: CasosConflictoSchema },

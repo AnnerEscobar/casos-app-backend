@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateBusquedaDto } from './dto/create-busqueda.dto';
 import { UpdateBusquedaDto } from './dto/update-busqueda.dto';
 import { CasosAlerta } from 'src/casos-alerta/entities/casos-alerta.entity';
@@ -155,37 +155,36 @@ export class BusquedasService {
 async buscarCasosFiltrados(filtros: any): Promise<any[]> {
   const { tipoCaso, estado, fechaInicio, fechaFin, origenAlerta, casaHogar } = filtros;
 
-  // ✅ Corrección: usar createdAt, no fechaRegistro
-  const fechaFiltro = (fechaInicio && fechaFin) ? {
-    createdAt: {
-      $gte: new Date(fechaInicio),
-      $lte: new Date(fechaFin),
-    }
-  } : {};
+  const rango: any = {};
+  if (fechaInicio) rango.$gte = new Date(fechaInicio);
+  if (fechaFin) { rango.$lte = new Date(fechaFin); if (/^\d{4}-\d{2}-\d{2}$/.test(fechaFin)) rango.$lte.setUTCHours(23,59,59,999); }
+  if (Object.values(rango).some((d: Date) => Number.isNaN(d.getTime())) || (rango.$gte && rango.$lte && rango.$gte > rango.$lte)) throw new BadRequestException('Rango de fechas inválido.');
+  if (tipoCaso && !['Alerta Alba-Keneth','Maltrato','Conflicto'].includes(tipoCaso)) throw new BadRequestException('Tipo de caso inválido.');
+  const fechaFiltro = Object.keys(rango).length ? { createdAt: rango } : {};
 
   let resultados: any[] = [];
 
-  if (tipoCaso === 'Alerta Alba-Keneth') {
+  if (!tipoCaso || tipoCaso === 'Alerta Alba-Keneth') {
     const query: any = { ...fechaFiltro };
     if (estado) query.estadoInvestigacion = estado;
     if (origenAlerta) query.origenAlerta = origenAlerta;
     if (casaHogar) query.casaHogar = { $regex: casaHogar, $options: 'i' };
 
     const alertas = await this.casosAlertaModel.find(query).exec();
-    resultados = alertas.map(alerta => ({ ...alerta.toObject(), tipo: 'Alerta' }));
+    resultados.push(...alertas.map(alerta => ({ ...alerta.toObject(), tipo: 'Alerta' })));
   }
 
-  else if (tipoCaso === 'Maltrato') {
+  if (!tipoCaso || tipoCaso === 'Maltrato') {
     const query: any = { ...fechaFiltro };
     if (estado) query.estadoInvestigacion = estado;
 
     const maltratos = await this.casosMaltratoModel.find(query).exec();
-    resultados = maltratos.map(m => ({ ...m.toObject(), tipo: 'Maltrato' }));
+    resultados.push(...maltratos.map(m => ({ ...m.toObject(), tipo: 'Maltrato' })));
   }
 
-  else if (tipoCaso === 'Conflicto') {
-    const conflictos = await this.casosConflictoModel.find({ ...fechaFiltro }).exec();
-    resultados = conflictos.map(c => ({ ...c.toObject(), tipo: 'Conflicto' }));
+  if (!tipoCaso || tipoCaso === 'Conflicto') {
+    const conflictos = await this.casosConflictoModel.find({ ...fechaFiltro, ...(estado ? { estadoInvestigacion: estado } : {}) }).exec();
+    resultados.push(...conflictos.map(c => ({ ...c.toObject(), tipo: 'Conflicto' })));
   }
 
   return resultados;
