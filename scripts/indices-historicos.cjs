@@ -15,7 +15,7 @@ async function main() {
   if (!process.env.MONGO_URI) throw new Error('Configure MONGO_URI para la base que desea revisar.');
   await mongoose.connect(process.env.MONGO_URI, { autoIndex: false, autoCreate: false });
   const planes = [];
-  for (const tipo of ['alerta', 'maltrato', 'conflicto']) {
+  for (const tipo of (process.argv.includes('--solo-alerta') ? ['alerta'] : ['alerta', 'maltrato', 'conflicto'])) {
     const cap = tipo[0].toUpperCase() + tipo.slice(1);
     const entity = require(`../dist/casos-${tipo}/entities/casos-${tipo}.entity.js`);
     const modelo = mongoose.model(`Casos${cap}`, entity[`Casos${cap}Schema`]);
@@ -25,6 +25,8 @@ async function main() {
     catch (error) { if (error.code === 26) indices = []; else throw error; }
     const campos = tipo === 'alerta' ? ['numeroDeic', 'numeroMp', 'numeroAlerta'] : ['numeroDeic'];
     for (const campo of campos) {
+      // Un requerimiento MP puede abarcar varias personas/alertas con distintos DEIC.
+      const unico = !(tipo === 'alerta' && campo === 'numeroMp');
       // Revisar todas las colecciones antes de realizar cualquier modificación.
       const duplicados = await collection.aggregate([
         { $match: { [campo]: { $type: 'string' } } },
@@ -32,23 +34,25 @@ async function main() {
         { $match: { cantidad: { $gt: 1 } } },
         { $limit: 1 },
       ]).toArray();
-      if (duplicados.length) throw new Error(`${collection.name}.${campo}: hay duplicados; resolverlos antes de aplicar. No se modificaron índices.`);
+      if (unico && duplicados.length) throw new Error(`${collection.name}.${campo}: hay duplicados; resolverlos antes de aplicar. No se modificaron índices.`);
       const parciales = tipo !== 'alerta' || campo !== 'numeroDeic';
       const filtro = { [campo]: { $type: 'string' } };
       const actuales = indices.filter(i => Object.keys(i.key).length === 1 && i.key[campo] === 1);
-      const correcto = actuales.some(i => i.unique && !i.sparse &&
-        (parciales ? JSON.stringify(i.partialFilterExpression) === JSON.stringify(filtro) : !i.partialFilterExpression));
+      const correcto = !unico
+        ? actuales.some(i => !i.unique && !i.sparse && !i.partialFilterExpression) && !actuales.some(i=>i.unique)
+        : actuales.some(i => i.unique && !i.sparse &&
+          (parciales ? JSON.stringify(i.partialFilterExpression) === JSON.stringify(filtro) : !i.partialFilterExpression));
       if (correcto) {
         console.log(`${collection.name}.${campo}: correcto`);
         continue;
       }
       const nombre = `${campo}_1`;
-      const retirar = actuales.filter(i => i.name === nombre || (i.unique && parciales && !i.partialFilterExpression));
+      const retirar = actuales.filter(i => i.name === nombre || (i.unique && (!unico || (parciales && !i.partialFilterExpression))));
       if (retirar.some(i => i.collation)) throw new Error(`${collection.name}.${campo}: índice con collation; requiere revisión manual.`);
       planes.push({ collection, campo, nombre, retirar, opciones: {
-        name: nombre, unique: true, ...(parciales ? { partialFilterExpression: filtro } : {}),
+        name: nombre, ...(unico ? { unique: true, ...(parciales ? { partialFilterExpression: filtro } : {}) } : {}),
       } });
-      console.log(`${collection.name}.${campo}: ${parciales ? 'único parcial para strings' : 'único'}; sustituir: ${retirar.map(i => i.name).join(', ') || 'ninguno'}`);
+      console.log(`${collection.name}.${campo}: ${!unico ? 'no único (requerimiento compartido)' : parciales ? 'único parcial para strings' : 'único'}; sustituir: ${retirar.map(i => i.name).join(', ') || 'ninguno'}`);
     }
   }
   if (!apply) {

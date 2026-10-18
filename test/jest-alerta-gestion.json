@@ -1,0 +1,8 @@
+{
+  "rootDir": "..",
+  "testRegex": "alerta-gestion.spec.ts$",
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "transform": { "^.+\\.ts$": "ts-jest" },
+  "moduleNameMapper": { "^src/(.*)$": "<rootDir>/src/$1" },
+  "testEnvironment": "node"
+}

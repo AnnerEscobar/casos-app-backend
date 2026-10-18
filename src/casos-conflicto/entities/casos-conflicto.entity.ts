@@ -1,3 +1,4 @@
+import { FichaConflicto, FichaConflictoSchema } from './ficha-conflicto.schema';
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import {
   Prop,
@@ -31,6 +32,16 @@ export type CasosConflictoDocument =
   _id: false
 })
 export class VictimaInfractor {
+  @Prop({type:Number,min:0,max:130,validate:Number.isInteger}) edadReportada?: number;
+  @Prop() sexo?: string;
+  @Prop() alias?: string;
+  @Prop() ocupacion?: string;
+  @Prop() nombrePadre?: string;
+  @Prop() nombreMadre?: string;
+  @Prop() estadoFisico?: string;
+  @Prop() telefono?: string;
+  @Prop() tipoPersona?: string;
+
 
   @Prop({
     required: true
@@ -207,6 +218,15 @@ export const RevisionRegistroConflictoSchema =
   timestamps: true
 })
 export class CasosConflicto extends Document {
+  @Prop({default:false}) procesoConflicto?: boolean;
+  @Prop({default:false}) expedienteEnPreparacion?: boolean;
+  @Prop({type:Types.ObjectId,ref:'Usuario'}) investigadorAsignado?: Types.ObjectId;
+  @Prop({type:Date}) fechaIngreso?: Date;
+  @Prop({type:Date}) fechaEnvioRevision?: Date;
+  @Prop({type:FichaConflictoSchema,default:()=>({})}) fichaConflicto?: FichaConflicto;
+
+
+
 
 
   /* =========================
@@ -396,4 +416,19 @@ export const CasosConflictoSchema =
   );
 export interface CasosConflicto extends MetadatosCasoHistorico {}
 configurarCasoHistorico(CasosConflictoSchema, ["numeroMp","estadoInvestigacion"]);
+// Reemplazar las reglas previas evita duplicar validadores required en Mongoose.
+for(const campo of ['numeroMp','estadoInvestigacion']) {
+  const path=CasosConflictoSchema.path(campo) as any;
+  path.validators=path.validators.filter((v:any)=>v.type!=='required');
+  path.required(function(){return this.origenCaso!=='HISTORICO' && !this.procesoConflicto;});
+}
+for(const campo of ['victimas','infractores','lugarHechos']) {
+  const hijo=(CasosConflictoSchema.path(campo) as any).schema;
+  hijo.eachPath((_key:string,path:any)=>{
+    if(!path.isRequired)return;
+    path.validators=path.validators.filter((v:any)=>v.type!=='required');
+    path.required(function(){const caso=this.ownerDocument();return caso.origenCaso!=='HISTORICO' && !caso.procesoConflicto;});
+  });
+}
+CasosConflictoSchema.set('optimisticConcurrency',true);
 CasosConflictoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

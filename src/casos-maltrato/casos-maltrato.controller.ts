@@ -1,6 +1,10 @@
+import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
+import { Response } from 'express';
 import { CreateHistoricoMaltratoDto } from './dto/create-historico-maltrato.dto';
 import { SeguimientoDto } from '../common/dto/seguimiento.dto';
 import {
+  BadRequestException,
+  Res,
   Controller,
   Get,
   Post,
@@ -30,6 +34,55 @@ import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 export class CasosMaltratoController {
   constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
 
+  @Post('registro-inicial')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  registrarInicial(@Body() dto: RegistroInicialMaltratoDto, @Req() req: any) {
+    return this.casosMaltratoService.registrarInicial(dto,req.user);
+  }
+
+  @Get('gestion')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  gestion(@Req() req: any) { return this.casosMaltratoService.gestion(req.user); }
+
+  @Get('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosMaltratoService.detalleGestion(id,req.user); }
+
+  @Patch('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  completar(@Param('id') id: string,@Body() dto: CompletarMaltratoDto,@Req() req: any) {
+    return this.casosMaltratoService.completar(id,dto,req.user);
+  }
+
+  @Post('gestion/:id/entregar')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  entregar(@Param('id') id: string,@Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder().addFileTypeValidator({fileType:'application/pdf'}).build({fileIsRequired:true})) file: Express.Multer.File) {
+    return this.casosMaltratoService.entregar(id,req.user,file);
+  }
+
+  @Get('exportar-excel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  async exportarExcel(@Res() res: Response) {
+    const archivo=await this.casosMaltratoService.exportarExcel();
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition','attachment; filename="base-maltrato.xlsx"');
+    res.send(archivo);
+  }
+
+
+  // ─────────────────────────────────────────────
+  // REGISTRO DE MALTRATO
+  // Apertura normal por analista sin documentos; los históricos conservan su ruta.
+  // ─────────────────────────────────────────────
+
   @Post('historico')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -46,27 +99,11 @@ export class CasosMaltratoController {
 
   @Post('crear-maltrato')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @Roles(UserRole.ANALISTA)
   @UseInterceptors(FileInterceptor('file'))
-  async create(
-    @Body() createCasosMaltratoDto: CreateCasosMaltratoDto,
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({
-          fileType: 'application/pdf',
-        })
-        .build({
-          fileIsRequired: true,
-        }),
-    )
-    file: Express.Multer.File,
-    @Req() req: any,
-  ) {
-    return this.casosMaltratoService.create(
-      createCasosMaltratoDto,
-      file,
-      req.user,
-    );
+  crearInicial(@Body() dto:RegistroInicialMaltratoDto,@Req() req:any,@UploadedFile() file?:Express.Multer.File){
+    if(file)throw new BadRequestException('El registro inicial solo admite datos, sin archivos.');
+    return this.casosMaltratoService.registrarInicial(dto,req.user);
   }
 
   @Get()

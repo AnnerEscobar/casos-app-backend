@@ -1,3 +1,5 @@
+import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
+import { generarExcelConflictos } from './conflicto-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
 import { CreateHistoricoConflictoDto } from './dto/create-historico-conflicto.dto';
 import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
@@ -5,6 +7,7 @@ import { normalizeCaseNumber } from '../common/case-number.validator';
 import { GoogleApiService } from 'src/google-api/google-api.service';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException
@@ -22,6 +25,85 @@ import { UserRole } from 'src/auth/enums/user-role.enum';
 
 @Injectable()
 export class CasosConflictoService {
+  async registrarInicial(dto: RegistroInicialConflictoDto, usuario: UsuarioSesion) {
+    if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna el caso inicial de conflicto.');
+    await auditoriaSeguimiento(this.casoModel, usuario, dto.investigadorAsignado);
+    const caso = new this.casoModel({
+      ...dto, numeroDeic: assertValidCaseNumber('conflicto', dto.numeroDeic),
+      investigadorAsignado: new Types.ObjectId(dto.investigadorAsignado),
+      registradoPor: new Types.ObjectId(usuario.userId),
+      procesoConflicto: true, expedienteEnPreparacion: true, estadoRegistro: EstadoRegistro.PENDIENTE,
+      fileUrls: [], seguimientos: [], historialRevisiones: [],
+    });
+    try { return await caso.save(); }
+    catch (e) {
+      if(e.code===11000) throw new ConflictException('Ya existe un caso de conflicto con estos identificadores.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async gestion(usuario: UsuarioSesion) {
+    if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
+    return this.casoModel.find({ procesoConflicto: true,
+      ...(usuario.role===UserRole.INVESTIGADOR ? {investigadorAsignado:usuario.userId} : {}),
+    }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
+  }
+
+  async detalleGestion(id: string, usuario: UsuarioSesion) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de conflicto inválido.');
+    const caso=await this.casoModel.findById(id);
+    if(!caso || !caso.procesoConflicto) throw new NotFoundException('Registro de conflicto no encontrado.');
+    if(usuario.role!==UserRole.ANALISTA && !(usuario.role===UserRole.INVESTIGADOR && String(caso.investigadorAsignado)===String(usuario.userId))) throw new ForbiddenException('Este caso de conflicto no está asignado a tu usuario.');
+    return caso;
+  }
+
+  async completar(id: string, dto: CompletarConflictoDto, usuario: UsuarioSesion) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    const datos:any={...dto};
+    const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
+    if('fichaConflicto' in datos) datos.fichaConflicto={...plano(caso.fichaConflicto),...datos.fichaConflicto};
+    if(datos.lugarHechos)datos.lugarHechos={...plano(caso.lugarHechos),...datos.lugarHechos};
+    caso.set(datos);
+    try {return await caso.save();} catch(e){
+      if(e.code===11000) throw new ConflictException('Ya existe un caso de conflicto con estos identificadores.');
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió. Vuelve a consultarlo.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    if(!file) throw new BadRequestException('Adjunta el expediente completo en PDF.');
+    if(!caso.numeroMp || !caso.estadoInvestigacion || !caso.lugarHechos?.departamento?.trim() || !caso.lugarHechos?.municipio?.trim() || !caso.lugarHechos?.direccionDetallada?.trim()) throw new BadRequestException('Completa MP, estado de investigación y lugar de los hechos.');
+    if(!caso.infractores?.length || caso.infractores.some(v=>!v.nombre?.trim() || (!v.fecha_Nac && v.edadReportada==null))) throw new BadRequestException('Completa el nombre y la fecha de nacimiento o edad conocida de cada adolescente infractor.');
+    if(caso.victimas?.some(v=>!v.nombre?.trim())) throw new BadRequestException('Completa los nombres de las víctimas o denunciantes o retira las filas vacías.');
+    await caso.validate();
+    const url=await this.subirDocumentoCaso(file,caso.numeroDeic);
+    caso.fileUrls.push(url);
+    caso.historialRevisiones.push({tipo:TipoRevisionRegistro.REENVIO,usuario:new Types.ObjectId(usuario.userId),fecha:new Date(),observacion:'Expediente completo enviado para revisión.',archivoUrl:url});
+    caso.estadoRegistro=EstadoRegistro.PENDIENTE;
+    caso.expedienteEnPreparacion=false;
+    caso.fechaEnvioRevision=new Date();
+    try {return await caso.save();} catch(e){
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió durante la entrega. Vuelve a consultarlo.');
+      throw e;
+    }
+  }
+
+  async exportarExcel() {
+    const casos=await this.casoModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
+    return generarExcelConflictos(casos);
+  }
+
+
+
+
 
   async incorporarHistorico(dto: CreateHistoricoConflictoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     return incorporarHistorico(this.casoModel, 'conflicto', dto, dto, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
@@ -259,8 +341,9 @@ async findPendientes(): Promise<CasosConflictoDocument[]> {
 
   return this.casoModel
     .find({
-      estadoRegistro: EstadoRegistro.PENDIENTE
+      estadoRegistro: EstadoRegistro.PENDIENTE, expedienteEnPreparacion:{$ne:true}
     })
+    .populate('investigadorAsignado','nombre')
     .populate(
       'registradoPor',
       'nombre email role'
@@ -303,6 +386,7 @@ async aprobarRegistro(
   }
 
 
+  if(caso.procesoConflicto && (caso.expedienteEnPreparacion || !caso.fileUrls?.length)) throw new BadRequestException('El investigador aún no ha entregado el expediente.');
   const fechaAprobacion = new Date();
 
   caso.estadoRegistro =
@@ -368,6 +452,7 @@ async rechazarRegistro(
   }
 
 
+  if(caso.procesoConflicto && caso.expedienteEnPreparacion) throw new BadRequestException('El expediente aún está en preparación.');
   const fechaRechazo = new Date();
 
   caso.estadoRegistro =
@@ -416,8 +501,7 @@ async findMisRegistros(
   return this.casoModel
     .find({
 
-      registradoPor:
-        new Types.ObjectId(investigadorId),
+      $or:[{procesoConflicto:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoConflicto:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
 
       estadoRegistro: {
         $in: [
@@ -448,6 +532,8 @@ async reenviarRegistro(
   file: Express.Multer.File
 ): Promise<CasosConflictoDocument> {
 
+  const registro=await this.casoModel.findById(casoId);
+  if(registro?.procesoConflicto)return this.entregar(casoId,{userId:investigadorId,role:UserRole.INVESTIGADOR},file);
   if (!file) {
     throw new BadRequestException(
       'Debes adjuntar el archivo corregido'

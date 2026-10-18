@@ -1,0 +1,32 @@
+import { IsOptional, IsString, IsDateString, IsInt, Min, Max, MaxLength, Matches } from 'class-validator';
+export class FichaMaltratoDto {
+  @IsOptional() @IsString() @MaxLength(10000) procedencia?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoDocumento?: string;
+  @IsOptional() @IsDateString() fechaDocumento?: string;
+  @IsOptional() @IsString() @MaxLength(10000) unidadConoce?: string;
+  @IsOptional() @IsString() @MaxLength(10000) zonaHecho?: string;
+  @IsOptional() @IsDateString() fechaHecho?: string;
+  @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) horaHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) movilHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) modusOperandi?: string;
+  @IsOptional() @IsString() @MaxLength(10000) circunstanciaVictima?: string;
+  @IsOptional() @IsString() @MaxLength(10000) resenaHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) logrosObtenidos?: string;
+  @IsOptional() @IsDateString() fechaInformadoMp?: string;
+  @IsOptional() @IsString() @MaxLength(10000) numeroOficioMp?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoAtencion?: string;
+  @IsOptional() @IsString() @MaxLength(10000) clasificacionCaso?: string;
+  @IsOptional() @IsDateString() fechaEntregaAnalisis?: string;
+  @IsOptional() @IsString() @MaxLength(10000) observaciones?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) camarasUbicadas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) camarasSolicitadas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) camarasExtraidas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) fotogramas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) allanamientosSolicitados?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) allanamientosEjecutados?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) allanamientosAutorizados?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) aprehensionesSolicitadas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) aprehensionesEjecutadas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) aprehensionesAutorizadas?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) entrevistas?: number;
+}

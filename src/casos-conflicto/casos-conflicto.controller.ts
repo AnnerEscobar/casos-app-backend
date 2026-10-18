@@ -1,6 +1,10 @@
+import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
+import { Response } from 'express';
 import { CreateHistoricoConflictoDto } from './dto/create-historico-conflicto.dto';
 import { SeguimientoDto } from '../common/dto/seguimiento.dto';
 import {
+  Res,
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -45,6 +49,50 @@ export class CasosConflictoController {
   // Analista / Investigador
   // ─────────────────────────────────────────────
 
+  @Post('registro-inicial')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  registrarInicial(@Body() dto: RegistroInicialConflictoDto, @Req() req: any) {
+    return this.casosConflictoService.registrarInicial(dto,req.user);
+  }
+
+  @Get('gestion')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  gestion(@Req() req: any) { return this.casosConflictoService.gestion(req.user); }
+
+  @Get('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosConflictoService.detalleGestion(id,req.user); }
+
+  @Patch('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  completar(@Param('id') id: string,@Body() dto: CompletarConflictoDto,@Req() req: any) {
+    return this.casosConflictoService.completar(id,dto,req.user);
+  }
+
+  @Post('gestion/:id/entregar')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  entregar(@Param('id') id: string,@Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder().addFileTypeValidator({fileType:'application/pdf'}).build({fileIsRequired:true})) file: Express.Multer.File) {
+    return this.casosConflictoService.entregar(id,req.user,file);
+  }
+
+  @Get('exportar-excel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  async exportarExcel(@Res() res: Response) {
+    const archivo=await this.casosConflictoService.exportarExcel();
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition','attachment; filename="base-conflicto.xlsx"');
+    res.send(archivo);
+  }
+
+
   @Post('historico')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -61,155 +109,12 @@ export class CasosConflictoController {
 
   @Post('crear-conflicto')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
-  @UseInterceptors(FileInterceptor('file'))
-  async create(
-    @Body() createCasosConflictoDto: CreateCasosConflictoDto,
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({
-          fileType: 'application/pdf',
-        })
-        .build({
-          fileIsRequired: true,
-        }),
-    )
-    file: Express.Multer.File,
-    @Req() req: any,
-  ) {
-    return this.casosConflictoService.create(
-      createCasosConflictoDto,
-      file,
-      req.user,
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // PENDIENTES DE AUTORIZACIÓN
-  // Solo Analista
-  // ─────────────────────────────────────────────
-
-  @Get('pendientes-autorizacion')
-  @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
-  async findPendientes() {
-    return this.casosConflictoService.findPendientes();
-  }
-
-  // ─────────────────────────────────────────────
-  // MIS REGISTROS
-  // Solo Investigador
-  // ─────────────────────────────────────────────
-
-  @Get('mis-registros')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.INVESTIGADOR)
-  async findMisRegistros(@Req() req: any) {
-    return this.casosConflictoService.findMisRegistros(req.user.userId);
-  }
-
-  // ─────────────────────────────────────────────
-  // APROBAR REGISTRO
-  // Solo Analista
-  // ─────────────────────────────────────────────
-
-  @Patch(':id/aprobar-registro')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ANALISTA)
-  async aprobarRegistro(@Param('id') id: string, @Req() req: any) {
-    return this.casosConflictoService.aprobarRegistro(id, req.user.userId);
-  }
-
-  // ─────────────────────────────────────────────
-  // RECHAZAR REGISTRO
-  // Solo Analista
-  // ─────────────────────────────────────────────
-
-  @Patch(':id/rechazar-registro')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ANALISTA)
-  async rechazarRegistro(
-    @Param('id') id: string,
-    @Body() dto: RechazarRegistroDto,
-    @Req() req: any,
-  ) {
-    return this.casosConflictoService.rechazarRegistro(
-      id,
-      req.user.userId,
-      dto.motivo,
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // REENVIAR REGISTRO CORREGIDO
-  // Solo Investigador
-  // ─────────────────────────────────────────────
-
-  @Patch(':id/reenviar-registro')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.INVESTIGADOR)
   @UseInterceptors(FileInterceptor('file'))
-  async reenviarRegistro(
-    @Param('id') id: string,
-    @UploadedFile(
-      new ParseFilePipeBuilder()
-        .addFileTypeValidator({
-          fileType: 'application/pdf',
-        })
-        .build({
-          fileIsRequired: true,
-        }),
-    )
-    file: Express.Multer.File,
-    @Req() req: any,
-  ) {
-    return this.casosConflictoService.reenviarRegistro(
-      id,
-      req.user.userId,
-      file,
-    );
+  crearInicial(@Body() dto:RegistroInicialConflictoDto,@Req() req:any,@UploadedFile() file?:Express.Multer.File){
+    if(file)throw new BadRequestException('El registro inicial solo admite datos, sin archivos.');
+    return this.casosConflictoService.registrarInicial(dto,req.user);
   }
-
-  // ─────────────────────────────────────────────
-  // AGREGAR SEGUIMIENTO
-  // ─────────────────────────────────────────────
-
-  @Patch('seguimiento/:numeroDeic')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
-  @UseInterceptors(FileInterceptor('file'))
-  async actualizarSeguimiento(
-    @Param('numeroDeic') numeroDeic: string,
-
-    @Body()
-    body: SeguimientoDto,
-
-    @UploadedFile()
-    file: Express.Multer.File,
-    @Req() req: any,
-  ) {
-    return this.casosConflictoService.agregarSeguimiento(
-      numeroDeic,
-      body.estadoInvestigacion,
-      file,
-      req.user,
-      body.investigadorAsignado,
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // BUSCAR POR DEIC
-  // ─────────────────────────────────────────────
-
-  @Get('buscar/:numeroDeic')
-  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
-    return this.casosConflictoService.buscarPorNumeroDeic(numeroDeic);
-  }
-
-  // ─────────────────────────────────────────────
-  // LISTADO GENERAL
-  // Solo casos aprobados + históricos
-  // ─────────────────────────────────────────────
 
   @Get()
   async findAll(): Promise<CasosConflictoDocument[]> {

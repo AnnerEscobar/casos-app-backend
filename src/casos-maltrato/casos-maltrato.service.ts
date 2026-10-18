@@ -1,8 +1,10 @@
+import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
+import { generarExcelMaltratos } from './maltrato-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
 import { CreateHistoricoMaltratoDto } from './dto/create-historico-maltrato.dto';
 import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
 import { normalizeCaseNumber } from '../common/case-number.validator';
-import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { CreateCasosMaltratoDto } from './dto/create-casos-maltrato.dto';
 import { UpdateCasosMaltratoDto } from './dto/update-casos-maltrato.dto';
 import { CasosMaltrato, CasosMaltratoDocument } from './entities/casos-maltrato.entity';
@@ -18,6 +20,85 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosMaltratoService {
+  async registrarInicial(dto: RegistroInicialMaltratoDto, usuario: UsuarioSesion) {
+    if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna el caso inicial de maltrato.');
+    await auditoriaSeguimiento(this.casoModel, usuario, dto.investigadorAsignado);
+    const caso = new this.casoModel({
+      ...dto, infractores:dto.sindicados || [], numeroDeic: assertValidCaseNumber('maltrato', dto.numeroDeic),
+      investigadorAsignado: new Types.ObjectId(dto.investigadorAsignado),
+      registradoPor: new Types.ObjectId(usuario.userId),
+      procesoMaltrato: true, expedienteEnPreparacion: true, estadoRegistro: EstadoRegistro.PENDIENTE,
+      fileUrls: [], seguimientos: [], historialRevisiones: [],
+    });
+    try { return await caso.save(); }
+    catch (e) {
+      if(e.code===11000) throw new ConflictException('Ya existe un caso de maltrato con estos identificadores.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async gestion(usuario: UsuarioSesion) {
+    if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
+    return this.casoModel.find({ procesoMaltrato: true,
+      ...(usuario.role===UserRole.INVESTIGADOR ? {investigadorAsignado:usuario.userId} : {}),
+    }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
+  }
+
+  async detalleGestion(id: string, usuario: UsuarioSesion) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de maltrato inválido.');
+    const caso=await this.casoModel.findById(id);
+    if(!caso || !caso.procesoMaltrato) throw new NotFoundException('Registro de maltrato no encontrado.');
+    if(usuario.role!==UserRole.ANALISTA && !(usuario.role===UserRole.INVESTIGADOR && String(caso.investigadorAsignado)===String(usuario.userId))) throw new ForbiddenException('Este caso de maltrato no está asignado a tu usuario.');
+    return caso;
+  }
+
+  async completar(id: string, dto: CompletarMaltratoDto, usuario: UsuarioSesion) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    const {sindicados,...resto}=dto;
+    const datos:any={...resto};
+    if(sindicados!==undefined)datos.infractores=sindicados;
+    const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
+    if('fichaMaltrato' in datos) datos.fichaMaltrato={...plano(caso.fichaMaltrato),...datos.fichaMaltrato};
+    if(datos.lugarHechos)datos.lugarHechos={...plano(caso.lugarHechos),...datos.lugarHechos};
+    caso.set(datos);
+    try {return await caso.save();} catch(e){
+      if(e.code===11000) throw new ConflictException('Ya existe un caso de maltrato con estos identificadores.');
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió. Vuelve a consultarlo.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    if(!file) throw new BadRequestException('Adjunta el expediente completo en PDF.');
+    if(!caso.numeroMp || !caso.estadoInvestigacion || !caso.lugarHechos?.departamento?.trim() || !caso.lugarHechos?.municipio?.trim() || !caso.lugarHechos?.direccionDetallada?.trim()) throw new BadRequestException('Completa MP, estado de investigación y lugar de los hechos.');
+    if(!caso.victimas?.length || caso.victimas.some(v=>!v.nombre?.trim() || (!v.fecha_Nac && v.edadReportada==null))) throw new BadRequestException('Completa el nombre y la fecha de nacimiento o edad conocida de cada víctima.');
+    if(caso.infractores?.some(v=>!v.nombre?.trim())) throw new BadRequestException('Completa los nombres de los sindicados o retira las filas vacías.');
+    await caso.validate();
+    const url=await this.subirDocumentoCaso(file,caso.numeroDeic);
+    caso.fileUrls.push(url);
+    caso.historialRevisiones.push({tipo:TipoRevisionRegistro.REENVIO,usuario:new Types.ObjectId(usuario.userId),fecha:new Date(),observacion:'Expediente completo enviado para revisión.',archivoUrl:url});
+    caso.estadoRegistro=EstadoRegistro.PENDIENTE;
+    caso.expedienteEnPreparacion=false;
+    caso.fechaEnvioRevision=new Date();
+    try {return await caso.save();} catch(e){
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió durante la entrega. Vuelve a consultarlo.');
+      throw e;
+    }
+  }
+
+  async exportarExcel() {
+    const casos=await this.casoModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
+    return generarExcelMaltratos(casos);
+  }
+
+
 
   async incorporarHistorico(dto: CreateHistoricoMaltratoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     const { sindicados, ...datos } = dto;
@@ -301,8 +382,10 @@ export class CasosMaltratoService {
 
     return this.casoModel
       .find({
-        estadoRegistro: EstadoRegistro.PENDIENTE
+        estadoRegistro: EstadoRegistro.PENDIENTE,
+        expedienteEnPreparacion: {$ne:true}
       })
+      .populate('investigadorAsignado','nombre')
       .populate(
         'registradoPor',
         'nombre email role'
@@ -340,6 +423,7 @@ export class CasosMaltratoService {
       );
     }
 
+    if(caso.procesoMaltrato && (caso.expedienteEnPreparacion || !caso.fileUrls?.length)) throw new BadRequestException('El investigador aún no ha entregado el expediente.');
     const fechaAprobacion = new Date();
     caso.estadoRegistro = EstadoRegistro.APROBADO;
 
@@ -387,6 +471,7 @@ export class CasosMaltratoService {
       );
     }
 
+    if(caso.procesoMaltrato && caso.expedienteEnPreparacion) throw new BadRequestException('El expediente aún está en preparación.');
     caso.estadoRegistro = EstadoRegistro.RECHAZADO;
 
     caso.revisadoPor =
@@ -419,7 +504,7 @@ export class CasosMaltratoService {
 
     return this.casoModel
       .find({
-        registradoPor: new Types.ObjectId(investigadorId),
+        $or:[{procesoMaltrato:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoMaltrato:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
 
         estadoRegistro: {
           $in: [
@@ -449,6 +534,9 @@ export class CasosMaltratoService {
     investigadorId: string,
     file: Express.Multer.File
   ): Promise<CasosMaltratoDocument> {
+
+    const registro=await this.casoModel.findById(casoId);
+    if(registro?.procesoMaltrato)return this.entregar(casoId,{userId:investigadorId,role:UserRole.INVESTIGADOR},file);
 
     if (!file) {
       throw new BadRequestException(

@@ -1,4 +1,5 @@
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
+import { FichaAlertaSchema } from './ficha-alerta.schema';
 import {
   Prop,
   Schema,
@@ -81,6 +82,12 @@ export const RevisionRegistroAlertaSchema =
 
 @Schema({ timestamps: true })
 export class CasosAlerta {
+  @Prop({ default: false }) procesoAlerta?: boolean;
+  @Prop({ default: false }) expedienteEnPreparacion?: boolean;
+  @Prop({ type: Types.ObjectId, ref: 'Usuario' }) investigadorAsignado?: Types.ObjectId;
+  @Prop({ type: Date }) fechaIngreso?: Date;
+  @Prop({ type: Date }) fechaEnvioRevision?: Date;
+  @Prop({ type: FichaAlertaSchema, default: undefined }) fichaAlerta?: Record<string, any>;
 
   // ───────────────────────────────────────────
   // NÚMEROS DEL CASO
@@ -314,5 +321,15 @@ export const CasosAlertaSchema =
   );
 export interface CasosAlerta extends MetadatosCasoHistorico {}
 configurarCasoHistorico(CasosAlertaSchema, ["numeroMp","numeroAlerta","nombreDesaparecido","fecha_Nac","estadoInvestigacion","direccion"]);
-CasosAlertaSchema.index({ numeroMp: 1 }, { unique: true, partialFilterExpression: { numeroMp: { $type: 'string' } } });
+// El registro inicial normal admite datos pendientes sin alterar el contrato histórico.
+for (const campo of ['numeroMp', 'numeroAlerta', 'fecha_Nac', 'estadoInvestigacion', 'direccion']) {
+  const path = CasosAlertaSchema.path(campo) as any;
+  // Sustituir todas las reglas previas: required() agrega validadores.
+  path.validators = path.validators.filter((v: any) => v.type !== 'required');
+  path.required(function () {
+    return this.origenCaso !== 'HISTORICO' && !this.procesoAlerta;
+  });
+}
+CasosAlertaSchema.set('optimisticConcurrency', true);
+CasosAlertaSchema.index({ numeroMp: 1 });
 CasosAlertaSchema.index({ numeroAlerta: 1 }, { unique: true, partialFilterExpression: { numeroAlerta: { $type: 'string' } } });

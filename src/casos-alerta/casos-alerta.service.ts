@@ -2,7 +2,9 @@ import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimient
 import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
 import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
 import { normalizeCaseNumber, normalizeMpNumber } from '../common/case-number.validator';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { RegistroInicialAlertaDto, CompletarAlertaDto } from './dto/gestion-alerta.dto';
+import { generarExcelAlertas } from './alerta-excel';
 import { CreateCasosAlertaDto } from './dto/create-casos-alerta.dto';
 import { UpdateCasosAlertaDto } from './dto/update-casos-alerta.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -17,6 +19,82 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosAlertaService {
+  async registrarInicial(dto: RegistroInicialAlertaDto, usuario: UsuarioSesion) {
+    if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna la alerta inicial.');
+    await auditoriaSeguimiento(this.casosAlertaModel, usuario, dto.investigadorAsignado);
+    const caso = new this.casosAlertaModel({
+      ...dto, numeroDeic: assertValidCaseNumber('alerta', dto.numeroDeic),
+      investigadorAsignado: new Types.ObjectId(dto.investigadorAsignado),
+      registradoPor: new Types.ObjectId(usuario.userId),
+      procesoAlerta: true, expedienteEnPreparacion: true, estadoRegistro: EstadoRegistro.PENDIENTE,
+      fileUrls: [], seguimientos: [], historialRevisiones: [],
+    });
+    try { return await caso.save(); }
+    catch (e) {
+      if(e.code===11000) throw new ConflictException('Ya existe una alerta con estos identificadores.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async gestion(usuario: UsuarioSesion) {
+    if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
+    return this.casosAlertaModel.find({ procesoAlerta: true,
+      ...(usuario.role===UserRole.INVESTIGADOR ? {investigadorAsignado:usuario.userId} : {}),
+    }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
+  }
+
+  async detalleGestion(id: string, usuario: UsuarioSesion) {
+    if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de alerta inválido.');
+    const caso=await this.casosAlertaModel.findById(id);
+    if(!caso || !caso.procesoAlerta) throw new NotFoundException('Registro de alerta no encontrado.');
+    if(usuario.role!==UserRole.ANALISTA && !(usuario.role===UserRole.INVESTIGADOR && String(caso.investigadorAsignado)===String(usuario.userId))) throw new ForbiddenException('Esta alerta no está asignada a tu usuario.');
+    return caso;
+  }
+
+  async completar(id: string, dto: CompletarAlertaDto, usuario: UsuarioSesion) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    const datos={...dto};
+    const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
+    // Las observaciones del analista se preservan durante la edición del investigador.
+    if('fichaAlerta' in datos) datos.fichaAlerta={...plano(caso.fichaAlerta),...datos.fichaAlerta,observacionesAnalista:caso.fichaAlerta?.observacionesAnalista};
+    if(datos.direccion) datos.direccion={...plano(caso.direccion),...datos.direccion};
+    if(datos.denunciante) datos.denunciante={...plano(caso.denunciante),...datos.denunciante};
+    caso.set(datos);
+    try {return await caso.save();} catch(e){
+      if(e.code===11000) throw new ConflictException('Ya existe una alerta con estos identificadores.');
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió. Vuelve a consultarlo.');
+      if(e.name==='ValidationError') throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
+    const caso=await this.detalleGestion(id,usuario);
+    if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
+    if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
+    if(!file) throw new BadRequestException('Adjunta el expediente completo en PDF.');
+    if(!caso.nombreDesaparecido?.trim() || !caso.estadoInvestigacion || !caso.numeroMp || !caso.numeroAlerta || !caso.direccion?.departamento || !caso.direccion?.municipio || !caso.direccion?.direccionDetallada) throw new BadRequestException('Completa identificación, estado de investigación y lugar de desaparición antes de entregar.');
+    if(!caso.fecha_Nac) throw new BadRequestException('La fecha de nacimiento es obligatoria para que el investigador entregue el expediente.');
+    await caso.validate();
+    const url=await this.subirDocumentoCaso(file,caso.numeroDeic);
+    caso.fileUrls.push(url);
+    caso.historialRevisiones.push({tipo:TipoRevisionRegistro.REENVIO,usuario:new Types.ObjectId(usuario.userId),fecha:new Date(),observacion:'Expediente completo enviado para revisión.',archivoUrl:url});
+    caso.estadoRegistro=EstadoRegistro.PENDIENTE;
+    caso.expedienteEnPreparacion=false;
+    caso.fechaEnvioRevision=new Date();
+    try {return await caso.save();} catch(e){
+      if(e.name==='VersionError') throw new ConflictException('El expediente cambió durante la entrega. Vuelve a consultarlo.');
+      throw e;
+    }
+  }
+
+  async exportarExcel() {
+    const casos=await this.casosAlertaModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
+    return generarExcelAlertas(casos);
+  }
 
   async incorporarHistorico(dto: CreateHistoricoAlertaDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     const { lugarDesaparicion, datosLocalizacion, ...datos } = dto;
@@ -343,12 +421,14 @@ export class CasosAlertaService {
 
     return this.casosAlertaModel
       .find({
-        estadoRegistro: EstadoRegistro.PENDIENTE
+        estadoRegistro: EstadoRegistro.PENDIENTE,
+        expedienteEnPreparacion: { $ne: true },
       })
       .populate(
         'registradoPor',
         'nombre email role'
       )
+      .populate('investigadorAsignado','nombre')
       .populate(
         'revisadoPor',
         'nombre email role'
@@ -386,6 +466,7 @@ export class CasosAlertaService {
     }
 
     const fechaAprobacion = new Date();
+    if(caso.procesoAlerta && (caso.expedienteEnPreparacion || !caso.fileUrls?.length)) throw new BadRequestException('El investigador aún no ha entregado el expediente.');
 
     caso.estadoRegistro =
       EstadoRegistro.APROBADO;
@@ -439,6 +520,7 @@ export class CasosAlertaService {
     }
 
     const fechaRechazo = new Date();
+    if(caso.procesoAlerta && caso.expedienteEnPreparacion) throw new BadRequestException('El expediente aún está en preparación.');
 
     caso.estadoRegistro =
       EstadoRegistro.RECHAZADO;
@@ -481,7 +563,10 @@ export class CasosAlertaService {
 
     return this.casosAlertaModel
       .find({
-        registradoPor: new Types.ObjectId(investigadorId),
+        $or: [
+          { procesoAlerta: true, investigadorAsignado: new Types.ObjectId(investigadorId) },
+          { procesoAlerta: { $ne: true }, registradoPor: new Types.ObjectId(investigadorId) },
+        ],
 
         estadoRegistro: {
           $in: [
@@ -512,6 +597,8 @@ export class CasosAlertaService {
     investigadorId: string,
     file: Express.Multer.File
   ): Promise<CasosAlertaDocument> {
+    const registro=await this.casosAlertaModel.findById(casoId);
+    if(registro?.procesoAlerta) return this.entregar(casoId,{userId:investigadorId,role:UserRole.INVESTIGADOR},file);
 
     const caso =
       await this.casosAlertaModel.findById(casoId);

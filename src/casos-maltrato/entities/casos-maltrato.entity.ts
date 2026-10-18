@@ -1,4 +1,5 @@
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
+import { FichaMaltrato, FichaMaltratoSchema } from './ficha-maltrato.schema';
 import {
   Prop,
   Schema,
@@ -88,6 +89,18 @@ export const RevisionRegistroSchema =
   _id: false
 })
 export class PersonaMaltrato {
+  @Prop({type:Number,min:0,max:130,validate:Number.isInteger}) edadReportada?: number;
+  @Prop() departamento?: string;
+  @Prop() municipio?: string;
+  @Prop() zona?: string;
+  @Prop() etnia?: string;
+  @Prop() sexo?: string;
+  @Prop() nacionalidad?: string;
+  @Prop() ocupacion?: string;
+  @Prop() parentesco?: string;
+  @Prop() denuncianteNombre?: string;
+  @Prop() denuncianteTelefono?: string;
+  @Prop() denuncianteParentesco?: string;
 
   @Prop({
     required: true
@@ -204,6 +217,12 @@ export const SeguimientoSchema =
   timestamps: true
 })
 export class CasosMaltrato extends Document {
+  @Prop({default:false}) procesoMaltrato?: boolean;
+  @Prop({default:false}) expedienteEnPreparacion?: boolean;
+  @Prop({type:Types.ObjectId,ref:'Usuario'}) investigadorAsignado?: Types.ObjectId;
+  @Prop({type:Date}) fechaIngreso?: Date;
+  @Prop({type:Date}) fechaEnvioRevision?: Date;
+  @Prop({type:FichaMaltratoSchema,default:()=>({})}) fichaMaltrato?: FichaMaltrato;
 
 
   /* =========================
@@ -409,4 +428,19 @@ export const CasosMaltratoSchema =
   );
 export interface CasosMaltrato extends MetadatosCasoHistorico {}
 configurarCasoHistorico(CasosMaltratoSchema, ["numeroMp","estadoInvestigacion"]);
+// Reemplazar las reglas previas evita duplicar validadores required en Mongoose.
+for(const campo of ['numeroMp','estadoInvestigacion']) {
+  const path=CasosMaltratoSchema.path(campo) as any;
+  path.validators=path.validators.filter((v:any)=>v.type!=='required');
+  path.required(function(){return this.origenCaso!=='HISTORICO' && !this.procesoMaltrato;});
+}
+for(const campo of ['victimas','infractores','lugarHechos']) {
+  const hijo=(CasosMaltratoSchema.path(campo) as any).schema;
+  hijo.eachPath((_key:string,path:any)=>{
+    if(!path.isRequired)return;
+    path.validators=path.validators.filter((v:any)=>v.type!=='required');
+    path.required(function(){const caso=this.ownerDocument();return caso.origenCaso!=='HISTORICO' && !caso.procesoMaltrato;});
+  });
+}
+CasosMaltratoSchema.set('optimisticConcurrency',true);
 CasosMaltratoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

@@ -8,11 +8,13 @@ import {
   Param,
   Query,
   NotFoundException,
+  BadRequestException,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   UploadedFiles,
   Req,
+  Res,
   ParseFilePipeBuilder
 } from '@nestjs/common';
 
@@ -33,6 +35,8 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/auth/enums/user-role.enum';
 
 import { RechazarRegistroDto } from 'src/common/dto/rechazar-registro.dto';
+import { RegistroInicialAlertaDto, CompletarAlertaDto } from './dto/gestion-alerta.dto';
+import { Response } from 'express';
 @UseGuards(JwtAuthGuard)
 @Controller('alertas')
 export class CasosAlertaController {
@@ -41,11 +45,53 @@ export class CasosAlertaController {
     private readonly casosAlertaService: CasosAlertaService
   ) {}
 
+  @Post('registro-inicial')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  registrarInicial(@Body() dto: RegistroInicialAlertaDto, @Req() req: any) {
+    return this.casosAlertaService.registrarInicial(dto,req.user);
+  }
+
+  @Get('gestion')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  gestion(@Req() req: any) { return this.casosAlertaService.gestion(req.user); }
+
+  @Get('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
+  detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosAlertaService.detalleGestion(id,req.user); }
+
+  @Patch('gestion/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  completar(@Param('id') id: string,@Body() dto: CompletarAlertaDto,@Req() req: any) {
+    return this.casosAlertaService.completar(id,dto,req.user);
+  }
+
+  @Post('gestion/:id/entregar')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  entregar(@Param('id') id: string,@Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder().addFileTypeValidator({fileType:'application/pdf'}).build({fileIsRequired:true})) file: Express.Multer.File) {
+    return this.casosAlertaService.entregar(id,req.user,file);
+  }
+
+  @Get('exportar-excel')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  async exportarExcel(@Res() res: Response) {
+    const archivo=await this.casosAlertaService.exportarExcel();
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition','attachment; filename="base-alertas.xlsx"');
+    res.send(archivo);
+  }
+
 
   // ─────────────────────────────────────────────
   // CREAR ALERTA
-  // Solo Analista / Investigador
-  // PDF obligatorio
+  // Apertura normal por analista sin documentos; los históricos conservan su ruta.
   // ─────────────────────────────────────────────
 
   @Post('historico')
@@ -65,12 +111,11 @@ export class CasosAlertaController {
   @Post('crear-alerta')
   @UseGuards(RolesGuard)
   @Roles(
-    UserRole.ANALISTA,
-    UserRole.INVESTIGADOR
+    UserRole.ANALISTA
   )
   @UseInterceptors(FileInterceptor('file'))
   async create(
-    @Body() createCasosAlertaDto: CreateCasosAlertaDto,
+    @Body() createCasosAlertaDto: RegistroInicialAlertaDto,
 
     @UploadedFile(
       new ParseFilePipeBuilder()
@@ -78,7 +123,7 @@ export class CasosAlertaController {
           fileType: 'application/pdf'
         })
         .build({
-          fileIsRequired: true
+          fileIsRequired: false
         })
     )
     file: Express.Multer.File,
@@ -86,11 +131,8 @@ export class CasosAlertaController {
     @Req() req: any
   ) {
 
-    return this.casosAlertaService.create(
-      createCasosAlertaDto,
-      file,
-      req.user
-    );
+    if(file) throw new BadRequestException('El registro inicial no admite archivos. El investigador entrega el expediente después.');
+    return this.casosAlertaService.registrarInicial(createCasosAlertaDto,req.user);
   }
 
 

@@ -1,0 +1,37 @@
+import { IsOptional, IsString, IsDateString, IsInt, Min, Max, MaxLength, Matches } from 'class-validator';
+export class FichaConflictoDto {
+  @IsOptional() @IsString() @MaxLength(10000) seccionConoce?: string;
+  @IsOptional() @IsString() @MaxLength(10000) hechoInvestigar?: string;
+  @IsOptional() @IsDateString() fechaAsignacion?: string;
+  @IsOptional() @IsString() @MaxLength(10000) institucionRemitente?: string;
+  @IsOptional() @IsString() @MaxLength(10000) procedencia?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoDocumento?: string;
+  @IsOptional() @IsDateString() fechaDocumento?: string;
+  @IsOptional() @IsString() @MaxLength(10000) emplazamiento?: string;
+  @IsOptional() @IsString() @MaxLength(10000) firmanteNombre?: string;
+  @IsOptional() @IsString() @MaxLength(10000) firmanteCargo?: string;
+  @IsOptional() @IsString() @MaxLength(10000) lineamientosMp?: string;
+  @IsOptional() @IsString() @MaxLength(10000) resenaHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) movilHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) modusOperandi?: string;
+  @IsOptional() @IsString() @MaxLength(10000) hipotesisHecho?: string;
+  @IsOptional() @IsDateString() fechaHecho?: string;
+  @IsOptional() @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) horaHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) lugarHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) lugarDetencion?: string;
+  @IsOptional() @IsString() @MaxLength(10000) aldeaColoniaBarrio?: string;
+  @IsOptional() @IsString() @MaxLength(10000) zonaHecho?: string;
+  @IsOptional() @IsString() @MaxLength(10000) demarcacionComisaria?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoVehiculo?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoPlacas?: string;
+  @IsOptional() @IsString() @MaxLength(10000) numeroPlacas?: string;
+  @IsOptional() @IsString() @MaxLength(10000) tipoAtencion?: string;
+  @IsOptional() @IsDateString() fechaPrimerInforme?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) folios?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) entrevistas?: number;
+  @IsOptional() @IsString() @MaxLength(10000) vistoBueno?: string;
+  @IsOptional() @IsString() @MaxLength(10000) clasificacionCaso?: string;
+  @IsOptional() @IsDateString() fechaEntregaAnalisis?: string;
+  @IsOptional() @IsString() @MaxLength(10000) observaciones?: string;
+  @IsOptional() @IsString() @MaxLength(10000) columnaAdicional?: string;
+}

@@ -282,8 +282,9 @@ describe('Normalización y auditoría', () => {
   it.each([SeguimientoDto, UpdateCasosAlertaDto])('rechaza suplantación de auditoría en seguimientos', async dto => {
     await expect(validar(dto, { estadoInvestigacion: 'En investigación', registradoPor: investigador.userId })).rejects.toBeInstanceOf(BadRequestException);
   });
-  it('Alerta declara índices parciales para permitir múltiples MP/alertas desconocidos', () => {
-    for (const campo of ['numeroMp', 'numeroAlerta']) {
+  it('Alerta admite MP compartido y conserva unicidad parcial del número de alerta conocido', () => {
+    expect(CasosAlertaSchema.indexes().find(([key])=>key.numeroMp===1)[1].unique).not.toBe(true);
+    for (const campo of ['numeroAlerta']) {
       const indice = CasosAlertaSchema.indexes().find(([key]) => key[campo] === 1);
       expect(indice[1].unique).toBe(true);
       expect(indice[1].partialFilterExpression).toEqual({ [campo]: { $type: 'string' } });
