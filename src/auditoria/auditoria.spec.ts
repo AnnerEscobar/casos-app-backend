@@ -202,6 +202,67 @@ describe('Transacciones HTTP y rechazos', () => {
     expect(req.auditoria.solicitudId).not.toBe('falso');
     expect(auditoria.registrar.mock.calls[0][1]).toMatchObject({ resultado: 'DENEGADO', codigoHttp: 403 });
   });
+  it.each(['/auth/session', '/dashboard', '/auth/investigadores', '/busquedas/investigadores', '/alertas/mis-registros', '/caratulas/pendientes/count'])(
+    'no llena la bitácora al cargar automáticamente %s', async ruta => {
+      req.method = 'GET'; req.originalUrl = ruta; req.path = '/';
+      await expect(lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') }))).resolves.toBe('ok');
+      expect(auditoria.registrar).not.toHaveBeenCalled();
+      expect(conexion.startSession).not.toHaveBeenCalled();
+    });
+  it.each(['/busquedas/buscar?estado=Informado', '/busquedas/por-nombre?nombre=Persona', '/auditoria?pagina=2'])(
+    'mostrar o paginar resultados no registra expedientes consultados: %s', async ruta => {
+      req.method = 'GET'; req.path = '/'; req.originalUrl = ruta;
+      await lastValueFrom(interceptor.intercept(ctx, { handle: () => of(Array.from({ length: 30 }, (_, i) => ({ _id: String(i) }))) }));
+      expect(auditoria.registrar).not.toHaveBeenCalled();
+    });
+  it('conserva la ruta original sin copiar parámetros al abrir un expediente', async () => {
+    req.method = 'GET'; req.path = '/'; req.originalUrl = '/busquedas/expediente/Alerta/id?token=secreto';
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => of({ _id: 'id', numeroDeic: 'DEIC-123' }) }));
+    expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar.mock.calls[0][0].ruta).toBe('/busquedas/expediente/Alerta/id');
+    expect(auditoria.registrar.mock.calls[0][1]).toMatchObject({ accion: 'CONSULTAR', resultado: 'EXITOSO', recurso: 'CasosAlerta', recursoId: 'id', casoId: 'id', numeroDeic: 'DEIC-123' });
+  });
+  it('conserva la consulta individual del expediente en un único evento', async () => {
+    req.method = 'GET'; req.originalUrl = '/busquedas/expediente/Alerta/id';
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => of({}) }));
+    expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar.mock.calls[0][1]).toMatchObject({ accion: 'CONSULTAR', resultado: 'EXITOSO' });
+  });
+  it('registra la descarga antes del handler sin duplicar ni afirmar recepción', async () => {
+    req.method = 'GET'; req.originalUrl = '/documentacion-inicial/id/pdf';
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => {
+      expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+      return of('archivo');
+    } }));
+    expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar.mock.calls[0][1]).toMatchObject({ accion: 'DESCARGAR', resultado: 'INICIADO' });
+  });
+  it('no duplica los eventos de datos y mantiene la transacción', async () => {
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => defer(() => {
+      req.auditoria.eventos = 1;
+      return of('ok');
+    }) }));
+    expect(auditoria.registrar).not.toHaveBeenCalled();
+    expect(session.commitTransaction).toHaveBeenCalledTimes(1);
+  });
+  it.each(['/auth/login', '/auth/logout'])('conserva el evento de sesión en %s', async ruta => {
+    req.method = 'POST'; req.originalUrl = ruta; req.auditoria.eventos = 1;
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') }));
+    expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar.mock.calls[0][1].accion).toBe(ruta.endsWith('login') ? 'INICIAR_SESION' : 'CERRAR_SESION');
+  });
+  it('omite el 401 normal de sesión ausente sin perder el 403 de un expediente', async () => {
+    const middleware = new AuditoriaMiddleware(auditoria);
+    let terminar: () => void;
+    const res = { statusCode: 401, setHeader: jest.fn(), once: (_: string, fn: () => void) => { terminar = fn; } };
+    req.headers = {}; req.originalUrl = '/auth/session'; req.path = '/';
+    middleware.use(req, res, () => {}); terminar(); await Promise.resolve();
+    expect(auditoria.registrar).not.toHaveBeenCalled();
+    req.originalUrl = '/busquedas/expediente/Alerta/id'; res.statusCode = 403;
+    middleware.use(req, res, () => {}); terminar(); await Promise.resolve();
+    expect(auditoria.registrar).toHaveBeenCalledTimes(1);
+    expect(auditoria.registrar.mock.calls[0][0].ruta).toBe('/busquedas/expediente/Alerta/id');
+  });
 });
 
 describe('Protección al iniciar el servidor', () => {

@@ -6,6 +6,35 @@ import { defer, lastValueFrom } from 'rxjs';
 import { contextoAuditoria, ContextoAuditoria } from './auditoria-core';
 import { AuditoriaService } from './auditoria.service';
 
+// originalUrl conserva la ruta completa aunque Express monte el middleware en '/'.
+// Se excluye la consulta para no copiar datos sensibles ni credenciales de la URL.
+const rutaSolicitud = (req: any): string =>
+  String(req.originalUrl || `${req.baseUrl || ''}${req.path || '/'}`).split('?')[0];
+
+// Solo las lecturas de negocio generan bitácora; catálogos y cargas automáticas no.
+function accionLectura(ruta: string): string | undefined {
+  if (/exportar|\/pdf(?:\/|$)|descargar/.test(ruta)) return 'DESCARGAR';
+  if (/^\/busquedas\/expediente\//.test(ruta) ||
+      /^\/(alertas|maltratos|conflictos)\/(gestion\/[^/]+|buscar\/[^/]+|by-deic\/[^/]+|[a-f\d]{24})\/?$/i.test(ruta) ||
+      /^\/alertas\/por-expedienteMP\/?$/.test(ruta) ||
+      /^\/documentacion-inicial\/(para-caso\/[^/]+\/[^/]+|[a-f\d]{24}(?:\/(plan|rubrica))?)\/?$/i.test(ruta) ||
+      /^\/informes\/(?!pendientes(?:\/|$))[^/]+\/?$/.test(ruta) ||
+      /^\/auditoria\/[^/]+\/?$/.test(ruta)) return 'CONSULTAR';
+  return undefined;
+}
+
+// La búsqueda devuelve resúmenes; solo el detalle abierto identifica un expediente
+// consultado. Se usan los datos autorizados del servidor, nunca el cuerpo del cliente.
+function expedienteConsultado(ruta: string, resultado: any): Record<string, string> {
+  const detalle = /^\/busquedas\/expediente\/(alerta|maltrato|conflicto)\/([^/]+)\/?$/i.exec(ruta);
+  if (!detalle || !resultado || Array.isArray(resultado)) return {};
+  const recursos = { alerta: 'CasosAlerta', maltrato: 'CasosMaltrato', conflicto: 'CasosConflicto' };
+  return {
+    recurso: recursos[detalle[1].toLowerCase()], recursoId: String(resultado._id || detalle[2]),
+    casoId: String(resultado._id || detalle[2]), numeroDeic: resultado.numeroDeic || '',
+  };
+}
+
 @Injectable()
 export class AuditoriaMiddleware implements NestMiddleware {
   private readonly logger = new Logger(AuditoriaMiddleware.name);
@@ -17,7 +46,7 @@ export class AuditoriaMiddleware implements NestMiddleware {
   use(req: any, res: any, next: () => void) {
     // No confiar en identificadores ni cabeceras X-Forwarded-For enviados por el cliente.
     const contexto: ContextoAuditoria = {
-      solicitudId: randomUUID(), metodo: req.method, ruta: req.path,
+      solicitudId: randomUUID(), metodo: req.method, ruta: rutaSolicitud(req),
       ip: req.ip || req.socket?.remoteAddress || '', agente: String(req.headers['user-agent'] || '').slice(0, 512), eventos: 0,
     };
     req.auditoria = contexto;
@@ -25,6 +54,14 @@ export class AuditoriaMiddleware implements NestMiddleware {
     res.once('finish', () => {
       // Incluye rechazos de los guards, que ocurren antes del interceptor.
       if (res.statusCode < 400 || req.method === 'OPTIONS') return;
+      // Una sesión ausente al abrir el login es normal. Rutas inexistentes y errores
+      // de cargas automáticas van al registro técnico, sin llenar la bitácora.
+      if (contexto.ruta === '/auth/session' && res.statusCode === 401) return;
+      if ((!req.route && !req.user) ||
+          (req.method === 'GET' && !accionLectura(contexto.ruta) && res.statusCode !== 401 && res.statusCode !== 403)) {
+        this.logger.warn(`Solicitud ${contexto.solicitudId}: ${req.method} ${contexto.ruta}; HTTP ${res.statusCode}.`);
+        return;
+      }
       if (req.user) contexto.usuario = actor(req.user);
       void this.auditoria.registrar(contexto, {
         accion: 'SOLICITUD', resultado: res.statusCode === 401 || res.statusCode === 403 ? 'DENEGADO' : 'ERROR',
@@ -49,18 +86,22 @@ export class AuditoriaInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest(), res = context.switchToHttp().getResponse();
     const registro: ContextoAuditoria = req.auditoria;
     if (!registro || req.method === 'OPTIONS') return next.handle();
+    registro.ruta = rutaSolicitud(req);
     return defer(() => contextoAuditoria.run(registro, async () => {
       if (req.user) registro.usuario = actor(req.user);
-      if (req.method === 'DELETE' && /^\/(alertas|maltratos|conflictos)(\/|$)/.test(req.path)) {
+      if (req.method === 'DELETE' && /^\/(alertas|maltratos|conflictos)(\/|$)/.test(registro.ruta)) {
         throw new ForbiddenException('Los expedientes no se pueden eliminar.');
       }
       const escritura = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+      const lectura = accionLectura(registro.ruta);
+      const sesionUsuario = registro.ruta === '/auth/login' ? 'INICIAR_SESION'
+        : registro.ruta === '/auth/logout' ? 'CERRAR_SESION' : undefined;
       const session = escritura ? await this.conexion.startSession() : undefined;
       try {
         // Algunos controladores envían archivos con @Res antes de devolver el
         // control. Registrar el inicio ANTES de permitir su lectura/descarga.
-        if (!escritura) await this.auditoria.registrar(registro, {
-          accion: /exportar|\/pdf(?:\/|$)|descargar/.test(req.path) ? 'DESCARGAR' : 'CONSULTAR',
+        if (!escritura && lectura === 'DESCARGAR') await this.auditoria.registrar(registro, {
+          accion: lectura,
           resultado: 'INICIADO', recurso: 'HTTP', cambios: [],
         });
         if (session) {
@@ -68,11 +109,12 @@ export class AuditoriaInterceptor implements NestInterceptor {
           session.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
         }
         const resultado = await lastValueFrom(next.handle());
-        // Evento HTTP también cuando solo cambiaron credenciales o no hubo campos diferentes.
-        await this.auditoria.registrar(registro, {
-          accion: req.path.startsWith('/auth/login') ? 'INICIAR_SESION' : req.path.startsWith('/auth/logout') ? 'CERRAR_SESION'
-            : /exportar|\/pdf(?:\/|$)|descargar/.test(req.path) ? 'DESCARGAR' : escritura ? 'SOLICITUD' : 'CONSULTAR',
+        // Los cambios ya tienen actor, ruta y solicitud: no duplicar con un resumen HTTP.
+        // Una descarga conserva INICIADO; no acredita recepción del archivo en el cliente.
+        if (sesionUsuario || (escritura && !registro.eventos) || (!escritura && lectura && lectura !== 'DESCARGAR')) await this.auditoria.registrar(registro, {
+          accion: sesionUsuario || (escritura ? 'SOLICITUD' : lectura),
           resultado: 'EXITOSO', codigoHttp: res.statusCode, recurso: 'HTTP', cambios: [], eventosDeDatos: registro.eventos,
+          ...(!escritura ? expedienteConsultado(registro.ruta, resultado) : {}),
         }, escritura);
         if (session) await session.commitTransaction();
         return resultado;

@@ -21,11 +21,22 @@ copia el cuerpo HTTP ni las cookies o cabeceras de autorización. La bitácora s
 puede contener datos sensibles del expediente en los campos modificados y debe
 protegerse como tal. No es un almacén de los archivos completos.
 
-Las consultas y descargas generan INICIADO antes del handler y EXITOSO después.
-Los rechazos/error HTTP se registran al terminar la respuesta, incluidos guards.
-Un evento INICIADO no acredita por sí solo una descarga completada. Las rutas de
+Las búsquedas, filtros, resultados y su paginación no generan eventos de consulta.
+Abrir el detalle de un expediente genera un único evento EXITOSO, con su tipo,
+identificador y DEIC cuando se consulta desde `/busquedas/expediente/:tipo/:id`.
+La lista de auditoría tampoco se registra automáticamente al cargarla o paginarla;
+la consulta individual de un evento sí. Las descargas generan solo INICIADO antes del handler: no acredita que
+el navegador haya recibido el archivo. Un fallo posterior genera su evento de
+error. Los rechazos de acceso se registran al terminar la respuesta, incluidos guards.
+Las rutas de
 login/logout identifican al usuario real sin guardar credenciales. Las lecturas
-de la propia bitácora también quedan registradas. El cierre de sesión que solo
+individuales de la propia bitácora también quedan registradas. Se omiten lecturas automáticas
+de sesión, paneles, listados y catálogos, así como el 401 esperado de `/auth/session`
+cuando no hay sesión. Los fallos de esas cargas (salvo rechazos de acceso) y las
+rutas inexistentes sin usuario se envían al log técnico del servidor. Las URLs
+se toman de `originalUrl` sin parámetros de consulta para conservar la ruta
+completa aunque Express monte el middleware en `/`.
+El cierre de sesión que solo
 ocurra en el navegador no equivale a una llamada de logout al servidor.
 
 ## Atomicidad y operaciones permitidas
@@ -34,7 +45,8 @@ Un interceptor inicia una transacción por petición POST/PUT/PATCH/DELETE.
 AsyncLocalStorage enlaza el contexto y la sesión con el middleware Mongoose
 instalado en la conexión antes de compilar los ocho modelos auditados. Sus
 lecturas comparten snapshot y sus escrituras, el registro del cambio y el evento
-HTTP se confirman juntos con `writeConcern: majority`. Si falla la auditoría o el
+HTTP (cuando no duplica eventos de datos) se confirman juntos con
+`writeConcern: majority`. Login/logout conservan su propio evento. Si falla la auditoría o el
 handler, se aborta. El actor nunca procede del cuerpo de la petición. No se
 reintenta automáticamente el handler, porque puede subir archivos a Drive.
 
