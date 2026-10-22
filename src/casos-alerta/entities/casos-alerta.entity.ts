@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import { FichaAlertaSchema } from './ficha-alerta.schema';
 import {
@@ -331,5 +332,6 @@ for (const campo of ['numeroMp', 'numeroAlerta', 'fecha_Nac', 'estadoInvestigaci
   });
 }
 CasosAlertaSchema.set('optimisticConcurrency', true);
+CasosAlertaSchema.plugin(textosMayusculasPlugin);
 CasosAlertaSchema.index({ numeroMp: 1 });
 CasosAlertaSchema.index({ numeroAlerta: 1 }, { unique: true, partialFilterExpression: { numeroAlerta: { $type: 'string' } } });

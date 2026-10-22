@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../common/textos-mayusculas';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 @Schema({ timestamps: true })
@@ -34,3 +35,4 @@ SolicitudAccesoSchema.index({
     tipo: 1, casoId: 1, solicitante: 1
 }, { unique: true });
 SolicitudAccesoSchema.index({ responsable: 1, estado: 1 });
+SolicitudAccesoSchema.plugin(textosMayusculasPlugin);

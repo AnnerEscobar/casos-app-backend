@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -75,6 +76,7 @@ export const ElementoPlanSchema =
 
 @Schema({ _id: false })
 export class PlanInvestigacion {
+  @Prop() mandoNombre?: string;
 
   @Prop({ type: [ElementoPlanSchema], default: [] })
   elementos: ElementoPlan[];
@@ -115,6 +117,8 @@ export const RespuestaRubricaSchema =
 
 @Schema({ _id: false })
 export class Rubrica {
+  @Prop() dependenciaSupervisada?: string;
+  @Prop() supervisorNombre?: string;
 
   @Prop({
     enum: [
@@ -304,3 +308,4 @@ export class DocumentacionInicial {
 
 export const DocumentacionInicialSchema =
   SchemaFactory.createForClass(DocumentacionInicial);
+DocumentacionInicialSchema.plugin(textosMayusculasPlugin);

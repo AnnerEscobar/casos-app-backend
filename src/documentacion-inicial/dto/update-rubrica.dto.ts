@@ -15,11 +15,12 @@ export class RespuestaRubricaDto {
   codigo: string;
 
 
+  @IsOptional()
   @IsEnum([
     'SI',
     'NO',
   ])
-  respuesta: 'SI' | 'NO';
+  respuesta?: 'SI' | 'NO';
 
 
   @IsOptional()
@@ -29,12 +30,20 @@ export class RespuestaRubricaDto {
 
 
 export class UpdateRubricaDto {
+  @IsOptional()
+  @IsString()
+  dependenciaSupervisada?: string;
 
+  @IsOptional()
+  @IsString()
+  supervisorNombre?: string;
+
+  @IsOptional()
   @IsEnum([
     'SI',
     'NO',
   ])
-  conoceProtocolo: 'SI' | 'NO';
+  conoceProtocolo?: 'SI' | 'NO';
 
 
   @IsArray()

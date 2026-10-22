@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -190,3 +191,4 @@ export class Informe {
 }
 
 export const InformeSchema = SchemaFactory.createForClass(Informe);
+InformeSchema.plugin(textosMayusculasPlugin);

@@ -1,4 +1,5 @@
 import { FichaConflicto, FichaConflictoSchema } from './ficha-conflicto.schema';
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import {
   Prop,
@@ -431,4 +432,5 @@ for(const campo of ['victimas','infractores','lugarHechos']) {
   });
 }
 CasosConflictoSchema.set('optimisticConcurrency',true);
+CasosConflictoSchema.plugin(textosMayusculasPlugin);
 CasosConflictoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

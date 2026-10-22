@@ -2,6 +2,7 @@ import {
   IsDate,
   IsEnum,
   IsOptional,
+  IsMongoId,
   IsString,
   ValidateNested,
 } from 'class-validator';
@@ -68,6 +69,9 @@ export class DatosCaratulaDto {
 ====================================================== */
 
 export class CreateDocumentacionInicialDto {
+  @IsOptional()
+  @IsMongoId()
+  casoId?: string;
 
   @IsEnum(['Alerta', 'Maltrato', 'Conflicto'])
   tipoCaso: 'Alerta' | 'Maltrato' | 'Conflicto';

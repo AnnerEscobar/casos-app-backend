@@ -2,6 +2,7 @@ import {
   IsDate,
   IsEnum,
   IsOptional,
+  IsMongoId,
   IsString,
   ValidateNested,
 } from 'class-validator';
@@ -59,6 +60,9 @@ export class UpdateDatosCaratulaDto {
 
 
 export class UpdateCaratulaDocumentacionDto {
+  @IsOptional()
+  @IsMongoId()
+  casoId?: string;
 
   @IsOptional()
   @IsString()

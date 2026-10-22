@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { configurarCasoHistorico, MetadatosCasoHistorico } from '../../common/historicos/caso-historico.schema';
 import { FichaMaltrato, FichaMaltratoSchema } from './ficha-maltrato.schema';
 import {
@@ -443,4 +444,5 @@ for(const campo of ['victimas','infractores','lugarHechos']) {
   });
 }
 CasosMaltratoSchema.set('optimisticConcurrency',true);
+CasosMaltratoSchema.plugin(textosMayusculasPlugin);
 CasosMaltratoSchema.index({ numeroDeic: 1 }, { unique: true, partialFilterExpression: { numeroDeic: { $type: 'string' } } });

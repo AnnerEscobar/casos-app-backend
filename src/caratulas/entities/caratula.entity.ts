@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -43,3 +44,4 @@ export class Caratula {
 }
 
 export const CaratulaSchema = SchemaFactory.createForClass(Caratula);
+CaratulaSchema.plugin(textosMayusculasPlugin);

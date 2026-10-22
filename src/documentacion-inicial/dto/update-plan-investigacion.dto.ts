@@ -31,6 +31,9 @@ export class ElementoPlanDto {
 
 
 export class UpdatePlanInvestigacionDto {
+  @IsOptional()
+  @IsString()
+  mandoNombre?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

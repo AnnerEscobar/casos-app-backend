@@ -10,10 +10,11 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 import { DocumentacionInicialService } from './documentacion-inicial.service';
 
@@ -57,6 +58,22 @@ export class DocumentacionInicialController {
     private readonly documentacionService:
       DocumentacionInicialService,
   ) {}
+
+  @Get('para-caso/:tipo/:casoId')
+  paraCaso(@Param('tipo') tipo: string, @Param('casoId') casoId: string, @Req() req: RequestAutenticado) {
+    const usuario = this.getInvestigador(req);
+    return this.documentacionService.paraCaso(tipo, casoId, usuario.userId);
+  }
+
+  @Get(':id/pdf')
+  async pdf(@Param('id') id: string, @Req() req: RequestAutenticado, @Res() res: Response) {
+    const usuario = this.getInvestigador(req);
+    const pdf = await this.documentacionService.generarPdf(id, usuario.userId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="documentacion-${pdf.numeroDeic}.pdf"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(pdf.buffer);
+  }
 
 
   /* ======================================================

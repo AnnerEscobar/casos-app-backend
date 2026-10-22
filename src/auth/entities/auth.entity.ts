@@ -1,3 +1,4 @@
+import { textosMayusculasPlugin } from '../../common/textos-mayusculas';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import { UserRole } from '../enums/user-role.enum';
@@ -33,3 +34,4 @@ export class Usuario {
 }
 
 export const UsuarioSchema = SchemaFactory.createForClass(Usuario);
+UsuarioSchema.plugin(textosMayusculasPlugin);

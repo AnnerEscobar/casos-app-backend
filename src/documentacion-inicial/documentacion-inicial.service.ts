@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -33,6 +34,7 @@ import {
 import { UpdatePlanInvestigacionDto } from './dto/update-plan-investigacion.dto';
 import { UpdateRubricaDto } from './dto/update-rubrica.dto';
 import { UpdateCaratulaDocumentacionDto } from './dto/update-caratula-documentacion.dto';
+import { generarDocumentacionPdf } from './documentacion-pdf';
 
 
 @Injectable()
@@ -42,6 +44,64 @@ export class DocumentacionInicialService {
     @InjectModel(DocumentacionInicial.name)
     private readonly documentacionModel: Model<DocumentacionInicialDocument>,
   ) {}
+
+  private async casoAsignado(tipo: string, casoId: string, investigadorId: string) {
+    const modelos = { Alerta: 'CasosAlerta', Maltrato: 'CasosMaltrato', Conflicto: 'CasosConflicto' };
+    if (!modelos[tipo] || !Types.ObjectId.isValid(casoId)) throw new BadRequestException('El caso indicado no es válido.');
+    const caso = await this.documentacionModel.db.model(modelos[tipo]).findById(casoId).populate('investigadorAsignado', 'nombre');
+    if (!caso) throw new NotFoundException('No se encontró el caso asignado.');
+    if (String(caso.investigadorAsignado?._id || caso.investigadorAsignado) !== investigadorId) {
+      throw new ForbiddenException('Solo el investigador asignado puede preparar estos documentos.');
+    }
+    return caso;
+  }
+
+  async paraCaso(tipo: string, casoId: string, investigadorId: string) {
+    const caso = await this.casoAsignado(tipo, casoId, investigadorId);
+    const documentacion = await this.documentacionModel.findOne({ numeroDeic: caso.numeroDeic });
+    if (documentacion && (String(documentacion.investigadorId) !== investigadorId || documentacion.tipoCaso !== tipo ||
+      (documentacion.casoId && documentacion.casoId !== casoId))) {
+      throw new ConflictException('El DEIC ya tiene documentación de otro expediente o investigador.');
+    }
+    const personas = tipo === 'Alerta' ? [{ nombre: caso.nombreDesaparecido, fecha_Nac: caso.fecha_Nac, edadReportada: caso.fichaAlerta?.edadReportada }]
+      : tipo === 'Maltrato' ? caso.victimas || [] : caso.infractores || [];
+    const edad = (persona: any) => {
+      if (persona.edadReportada != null) return String(persona.edadReportada);
+      if (!persona.fecha_Nac || !caso.fechaIngreso) return '';
+      const nac = new Date(persona.fecha_Nac), ingreso = new Date(caso.fechaIngreso);
+      if (Number.isNaN(nac.getTime()) || Number.isNaN(ingreso.getTime())) return '';
+      const valor = ingreso.getUTCFullYear() - nac.getUTCFullYear() - Number(ingreso.getUTCMonth() < nac.getUTCMonth() || (ingreso.getUTCMonth() === nac.getUTCMonth() && ingreso.getUTCDate() < nac.getUTCDate()));
+      return valor < 0 ? '' : String(valor);
+    };
+    const lugar = tipo === 'Alerta' ? caso.direccion : caso.lugarHechos;
+    return {
+      casoId, tipoCaso: tipo, numeroDeic: caso.numeroDeic,
+      editable: !!caso.expedienteEnPreparacion || caso.estadoRegistro === 'Rechazado',
+      caratula: {
+        numeroMp: caso.numeroMp || '', numeroAlerta: caso.numeroAlerta || '',
+        nombre: personas.map((p: any) => p.nombre).filter(Boolean).join('; '),
+        edad: personas.length === 1 ? edad(personas[0]) : personas.map((p: any) => `${p.nombre || 'Sin nombre'}: ${edad(p) || 'Sin indicar'}`).join('; '),
+        lugar: lugar?.direccionDetallada || '', departamento: lugar?.departamento || '', municipio: lugar?.municipio || '',
+      },
+      documentacion,
+    };
+  }
+
+  async generarPdf(id: string, investigadorId: string) {
+    const doc = await this.findOne(id, investigadorId);
+    // Consultar e imprimir no constituye una entrega ni modifica su estado.
+    const plan = this.planDocumento(doc), rubrica = this.rubricaDocumento(doc);
+    if (!doc.caratula?.nombre?.trim() || !doc.caratula?.lugar?.trim()) throw new BadRequestException('Complete nombre y lugar de la carátula antes de imprimir.');
+    assertValidCaratulaMpNumber(doc.tipoCaso, doc.caratula.numeroMp);
+    if (doc.tipoCaso === 'Alerta' && !/^\d+-\d{4}$/.test(doc.caratula.numeroAlerta || '')) throw new BadRequestException('Complete el número de alerta antes de imprimir.');
+    if (!plan.elementos.length || plan.elementos.some(e => ![e.informacionObtenida, e.informacionNecesitaObtener, e.diligenciasRealizar].some(v => v?.trim()))) {
+      throw new BadRequestException('Complete cada elemento del plan; indique No aplica cuando corresponda.');
+    }
+    if (!['SI', 'NO'].includes(rubrica.conoceProtocolo) || rubrica.items.some(i => i.tipo === 'ITEM' && !['SI', 'NO'].includes(i.respuesta))) {
+      throw new BadRequestException('Guarde las respuestas de todos los elementos y del protocolo de la rúbrica antes de imprimir.');
+    }
+    return { buffer: await generarDocumentacionPdf(doc, plan, rubrica), numeroDeic: doc.numeroDeic };
+  }
 
 
   /* ======================================================
@@ -58,6 +118,11 @@ async getPlanPaso(
       id,
       investigadorId,
     );
+
+  return this.planDocumento(documentacion);
+}
+
+private planDocumento(documentacion: DocumentacionInicialDocument) {
 
 
   const plantilla =
@@ -84,6 +149,8 @@ async getPlanPaso(
 
     titulo:
       plantilla.titulo,
+
+    mandoNombre: documentacion.planInvestigacion?.mandoNombre || '',
 
     elementos:
       plantilla.elementos.map(
@@ -149,6 +216,11 @@ async getRubricaPaso(
       investigadorId,
     );
 
+  return this.rubricaDocumento(documentacion);
+}
+
+private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
+
 
   let plantilla;
 
@@ -191,6 +263,9 @@ async getRubricaPaso(
 
     tipoRubrica:
       plantilla.tipo,
+
+    dependenciaSupervisada: documentacion.rubrica?.dependenciaSupervisada || '',
+    supervisorNombre: documentacion.rubrica?.supervisorNombre || '',
 
     titulo:
       plantilla.titulo,
@@ -272,15 +347,27 @@ async getRubricaPaso(
       caratulaTipoToCaseNumberTipo(dto.tipoCaso),
       dto.numeroDeic,
     );
+    // También vincular entradas desde el módulo general cuando el caso ya
+    // existe; omitir casoId no permite eludir la asignación ni el bloqueo.
+    if (!dto.casoId) {
+      const modelos = { Alerta: 'CasosAlerta', Maltrato: 'CasosMaltrato', Conflicto: 'CasosConflicto' };
+      const existente = await this.documentacionModel.db.model(modelos[dto.tipoCaso]).findOne({ numeroDeic });
+      if (existente) dto = { ...dto, casoId: String(existente._id) };
+    }
 
 
     /*
      * Validamos MP.
      */
-    const numeroMp = assertValidCaratulaMpNumber(
+    const numeroMp = !dto.caratula.numeroMp?.trim() && dto.casoId ? undefined : assertValidCaratulaMpNumber(
       dto.tipoCaso,
       dto.caratula.numeroMp,
     );
+
+    const caso = dto.casoId ? await this.casoAsignado(dto.tipoCaso, dto.casoId, investigadorId) : null;
+    if (caso && (caso.numeroDeic !== numeroDeic || (!caso.expedienteEnPreparacion && caso.estadoRegistro !== 'Rechazado'))) {
+      throw new ConflictException('El expediente no está disponible para preparar documentos.');
+    }
 
 
     /*
@@ -321,10 +408,12 @@ async getRubricaPaso(
 
         numeroDeic,
 
+        casoId: dto.casoId,
+
         investigadorId: new Types.ObjectId(investigadorId),
 
         investigadorNombre:
-          this.toTitleCase(investigadorNombre),
+          this.toTitleCase(caso?.investigadorAsignado?.nombre || investigadorNombre),
 
         estado: 'BORRADOR',
 
@@ -504,6 +593,14 @@ async getRubricaPaso(
       );
     }
 
+    if (documentacion.casoId) {
+      documentacion.$locals.casoAsociado = await this.casoAsignado(documentacion.tipoCaso, documentacion.casoId, investigadorId);
+    } else {
+      const modelos = { Alerta: 'CasosAlerta', Maltrato: 'CasosMaltrato', Conflicto: 'CasosConflicto' };
+      const caso = await this.documentacionModel.db.model(modelos[documentacion.tipoCaso]).findOne({ numeroDeic: documentacion.numeroDeic });
+      if (caso) documentacion.$locals.casoAsociado = await this.casoAsignado(documentacion.tipoCaso, String(caso._id), investigadorId);
+    }
+
 
     return documentacion;
   }
@@ -518,6 +615,7 @@ async updateCaratula(
   id: string,
   investigadorId: string,
   data: {
+    casoId?: string;
     numeroDeic?: string;
 
     modalidadMaltrato?:
@@ -532,7 +630,14 @@ async updateCaratula(
       await this.findOne(id, investigadorId);
 
 
-    this.assertEditable(documentacion);
+    await this.assertEditable(documentacion);
+    if (data.casoId) {
+      const caso = await this.casoAsignado(documentacion.tipoCaso, data.casoId, investigadorId);
+      if (caso.numeroDeic !== documentacion.numeroDeic || (documentacion.casoId && documentacion.casoId !== data.casoId) ||
+          (!caso.expedienteEnPreparacion && caso.estadoRegistro !== 'Rechazado')) throw new ConflictException('La documentación no corresponde a un expediente editable.');
+      documentacion.casoId = data.casoId;
+    }
+    if ((documentacion.casoId || documentacion.$locals?.casoAsociado) && data.numeroDeic && data.numeroDeic !== documentacion.numeroDeic) throw new BadRequestException('No se puede cambiar el DEIC del caso vinculado.');
 
 
     /*
@@ -567,6 +672,15 @@ async updateCaratula(
       }
 
 
+      if (!documentacion.casoId) {
+        const modelos = { Alerta: 'CasosAlerta', Maltrato: 'CasosMaltrato', Conflicto: 'CasosConflicto' };
+        const destino = await this.documentacionModel.db.model(modelos[documentacion.tipoCaso]).findOne({ numeroDeic });
+        if (destino) {
+          const caso = await this.casoAsignado(documentacion.tipoCaso, String(destino._id), investigadorId);
+          if (!caso.expedienteEnPreparacion && caso.estadoRegistro !== 'Rechazado') throw new ConflictException('El expediente ya fue enviado al analista.');
+          documentacion.casoId = String(caso._id);
+        }
+      }
       documentacion.numeroDeic = numeroDeic;
     }
 
@@ -579,6 +693,7 @@ async updateCaratula(
       data.modalidadMaltrato
     ) {
 
+      if (documentacion.modalidadMaltrato !== data.modalidadMaltrato) documentacion.rubrica = { respuestas: [] };
       documentacion.modalidadMaltrato =
         data.modalidadMaltrato;
     }
@@ -602,7 +717,7 @@ async updateCaratula(
     data.caratula.numeroMp !== undefined
   ) {
 
-    nuevosDatos.numeroMp =
+    nuevosDatos.numeroMp = !data.caratula.numeroMp?.trim() && documentacion.casoId ? undefined :
       assertValidCaratulaMpNumber(
         documentacion.tipoCaso,
         data.caratula.numeroMp,
@@ -653,7 +768,7 @@ async updatePlan(
     );
 
 
-  this.assertEditable(
+  await this.assertEditable(
     documentacion,
   );
 
@@ -704,6 +819,7 @@ async updatePlan(
    * los textos oficiales del backend.
    */
   documentacion.planInvestigacion = {
+    mandoNombre: plan.mandoNombre || '',
 
     elementos:
       plantilla.elementos.map(
@@ -779,7 +895,7 @@ async updateRubrica(
     );
 
 
-  this.assertEditable(
+  await this.assertEditable(
     documentacion,
   );
 
@@ -855,6 +971,8 @@ async updateRubrica(
    * las descripciones oficiales.
    */
   documentacion.rubrica = {
+    dependenciaSupervisada: dto.dependenciaSupervisada || '',
+    supervisorNombre: dto.supervisorNombre || '',
 
     tipo:
       plantilla.tipo,
@@ -926,7 +1044,7 @@ async updateRubrica(
       await this.findOne(id, investigadorId);
 
 
-    this.assertEditable(documentacion);
+    await this.assertEditable(documentacion);
 
 
     /*
@@ -1090,6 +1208,8 @@ async updateRubrica(
       );
     }
 
+    await this.assertEditable(documentacion);
+
 
     await this.documentacionModel.deleteOne({
       _id: documentacion._id,
@@ -1101,9 +1221,13 @@ async updateRubrica(
      VALIDAR SI PUEDE EDITARSE
   ====================================================== */
 
-  private assertEditable(
+  private async assertEditable(
     documentacion: DocumentacionInicialDocument,
-  ): void {
+  ): Promise<void> {
+    if (documentacion.casoId || documentacion.$locals?.casoAsociado) {
+      const caso = documentacion.casoId ? await this.casoAsignado(documentacion.tipoCaso, documentacion.casoId, String(documentacion.investigadorId)) : documentacion.$locals.casoAsociado;
+      if (!caso.expedienteEnPreparacion && caso.estadoRegistro !== 'Rechazado') throw new ConflictException('El expediente ya fue enviado al analista; sus documentos son de consulta.');
+    }
 
     if (
       documentacion.estado === 'REGISTRADO' ||
