@@ -1,12 +1,20 @@
 import { Workbook } from 'exceljs';
 import headers = require('./conflicto-excel-encabezados.json');
 
+// Convierte una fecha disponible a su día en UTC para exportarla como fecha de Excel y deja
+// sin valor las fechas inválidas.
 const fecha=(v:any):Date|null=>{
   if(!v)return null;const d=new Date(v);
   return Number.isNaN(d.getTime())?null:new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));
 };
+// Calcula los días entre dos fechas válidas y ordenadas, sin producir plazos negativos ni
+// completar fechas ausentes.
 const diferencia=(a:any,b:any)=>{const desde=fecha(a),hasta=fecha(b);return desde && hasta && hasta>=desde?Math.round((hasta.getTime()-desde.getTime())/86400000):null;};
+// Representa los datos ausentes como celdas vacías sin convertir los ceros o booleanos válidos
+// en valores faltantes.
 const valor=(v:any)=>v==null?'':v;
+// Calcula la edad del adolescente a la fecha de recepción si constan las fechas; conserva la
+// edad reportada cuando no puede calcularla.
 export function edadConflicto(v:any,ingreso:any):number|null {
   const nacimiento=fecha(v.fecha_Nac),recepcion=fecha(ingreso);
   if(nacimiento && recepcion){
@@ -15,14 +23,20 @@ export function edadConflicto(v:any,ingreso:any):number|null {
   }
   return v.edadReportada??null;
 }
+// Prepara las columnas de una persona, su edad y clasificación, respetando el orden especial
+// de alias y sexo del segundo bloque de la referencia.
 function datosInfractor(p:any,ingreso:any,segundo=false):any[] {
   if(!p)return Array(12).fill('');
   const edad=edadConflicto(p,ingreso);
   // La referencia invierte el orden de alias y sexo en el segundo bloque.
   return [p.nombre,edad,...(segundo?[p.sexo,p.alias]:[p.alias,p.sexo]),p.cui,p.direccion,fecha(p.fecha_Nac),edad==null?'':edad<18?'MENOR':'MAYOR',p.ocupacion,p.nombrePadre,p.nombreMadre,p.estadoFisico].map(valor);
 }
+// Construye las filas de Conflicto con los bloques de adolescentes, víctimas y diligencias,
+// conservando el orden original de las columnas.
 export function filasConflicto(c:any,ordenInicial=1):any[][] {
   const f=c.fichaConflicto||{},infractores=c.infractores||[],victimas=c.victimas||[],lugar=c.lugarHechos||{};
+  // Agrupa un campo de las víctimas en una celda con saltos de línea y conserva una indicación
+  // cuando falta información.
   const unir=(key:string)=>victimas.map((p:any)=>p[key]||'Sin indicar').join('\n');
   const ingreso=fecha(c.fechaIngreso);
   const mes=ingreso?['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][ingreso.getUTCMonth()]:'';
@@ -34,6 +48,8 @@ export function filasConflicto(c:any,ordenInicial=1):any[][] {
   }
   return filas;
 }
+// Genera el libro de Conflicto con los encabezados originales, tipos de celda y estilos de
+// exportación y devuelve su contenido en memoria.
 export async function generarExcelConflictos(casos:any[]):Promise<Buffer> {
   const wb=new Workbook();wb.creator='SGIC';
   const sheet=wb.addWorksheet('DEIC53',{views:[{state:'frozen',ySplit:1}]});sheet.addRow(headers);

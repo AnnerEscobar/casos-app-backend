@@ -11,31 +11,39 @@ import { InformeWordService } from './informe-word.service';
 @Controller('informes')
 export class InformesController {
 
+  // Recibe los servicios de informes y generación Word para administrar el contenido y descargar
+  // el documento.
   constructor(
   private readonly informesService: InformesService,
   private readonly informeWordService: InformeWordService
 ) {}
 
+  // Recibe los datos iniciales del informe y delega su creación y validación al servicio.
   @Post()
   crear(@Body() dto: CreateInformeDto) {
     return this.informesService.crear(dto);
   }
 
+  // Devuelve los informes almacenados mediante el servicio.
   @Get()
   obtenerTodos() {
     return this.informesService.obtenerTodos();
   }
 
+  // Consulta los informes marcados como pendientes de registro.
   @Get('pendientes')
   obtenerPendientes() {
     return this.informesService.obtenerPendientes();
   }
 
+  // Obtiene el informe identificado por el número DEIC de la ruta.
   @Get(':numeroDeic')
   obtenerPorDeic(@Param('numeroDeic') numeroDeic: string) {
     return this.informesService.obtenerPorDeic(numeroDeic);
   }
 
+  // Envía los campos recibidos para actualizar las secciones del informe conservando la
+  // información existente.
   @Patch(':numeroDeic/seccion')
   actualizarSeccion(
     @Param('numeroDeic') numeroDeic: string,
@@ -44,11 +52,13 @@ export class InformesController {
     return this.informesService.actualizarSeccion(numeroDeic, dto);
   }
 
+  // Solicita pasar el informe al estado pendiente de registro.
   @Patch(':numeroDeic/pendiente-registro')
   marcarPendiente(@Param('numeroDeic') numeroDeic: string) {
     return this.informesService.marcarPendienteRegistro(numeroDeic);
   }
 
+  // Recibe el PDF del informe y solicita registrar su entrega con los datos del expediente.
   @Patch(':numeroDeic/registrar')
   @UseInterceptors(FileInterceptor('pdf'))
   registrarConPdf(
@@ -59,6 +69,8 @@ export class InformesController {
     return this.informesService.registrarConPdf(numeroDeic, pdf, dto);
   }
 
+  // Recibe los datos y el archivo opcional de una ampliación para incorporarlos al informe
+  // existente.
   @Patch(':numeroDeic/ampliacion')
   @UseInterceptors(FileInterceptor('file'))
   agregarAmpliacion(
@@ -69,6 +81,7 @@ export class InformesController {
     return this.informesService.agregarAmpliacion(numeroDeic, descripcion, file);
   }
 
+  // Solicita eliminar el informe identificado por DEIC y devuelve la respuesta del servicio.
   @Delete(':numeroDeic')
   eliminar(@Param('numeroDeic') numeroDeic: string) {
     return this.informesService.eliminar(numeroDeic);
@@ -76,6 +89,8 @@ export class InformesController {
 
 
   // Nuevo endpoint:
+// Carga el informe, genera su documento Word y lo envía con las cabeceras de descarga
+// correspondientes.
 @Get(':numeroDeic/descargar-word')
 async descargarWord(
   @Param('numeroDeic') numeroDeic: string,

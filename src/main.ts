@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 
+// Crea la aplicación Nest, configura CORS y la validación global de entradas, y abre el puerto
+// definido para atender peticiones.
 async function bootstrap() {
 
   const app = await NestFactory.create(AppModule) as NestExpressApplication;

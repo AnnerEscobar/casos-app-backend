@@ -20,11 +20,15 @@ export interface MetadatosCasoHistorico {
 }
 
 // ownerDocument permite conservar las exigencias de personas/lugares en casos normales.
+// Indica si el documento pertenece al flujo normal para aplicar campos obligatorios que se
+// relajan en expedientes históricos.
 function requeridoEnSistema(this: any): boolean {
   const caso = typeof this.ownerDocument === 'function' ? this.ownerDocument() : this;
   return caso.origenCaso !== OrigenCaso.HISTORICO;
 }
 
+// Añade metadatos de procedencia e investigador original al esquema y adapta sus campos
+// obligatorios para permitir expedientes históricos incompletos.
 export function configurarCasoHistorico(schema: Schema, camposFlexibles: string[]) {
   schema.add({
     origenCaso: { type: String, enum: Object.values(OrigenCaso), default: OrigenCaso.SISTEMA },

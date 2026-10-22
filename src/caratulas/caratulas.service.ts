@@ -12,11 +12,14 @@ import { assertValidCaratulaMpNumber, assertValidCaseNumber, caratulaTipoToCaseN
 
 @Injectable()
 export class CaratulasService {
+  // Recibe el modelo de carátulas utilizado para registrar y consultar sus datos.
   constructor(
     @InjectModel(Caratula.name)
     private readonly caratulaModel: Model<CaratulaDocument>
   ) { }
   // Servicio 1: Guardar carátula
+  // Valida DEIC, MP y edades, normaliza los textos y crea la carátula si no existe otra con el
+  // mismo DEIC.
   async create(dto: CreateCaratulaDto): Promise<Caratula> {
     try {
       dto.numeroDeic = assertValidCaseNumber(caratulaTipoToCaseNumberTipo(dto.tipoCaso), dto.numeroDeic);
@@ -40,10 +43,12 @@ export class CaratulasService {
 
   
 
+  // Consulta todas las carátulas ordenadas desde la más reciente.
   async findAll(): Promise<Caratula[]> {
     return this.caratulaModel.find().sort({ createdAt: -1 }).exec();
   }
 
+  // Obtiene la carátula por DEIC e informa si no existe.
   async findOne(numeroDeic: string): Promise<Caratula> {
     const caratula = await this.caratulaModel.findOne({ numeroDeic });
     if (!caratula) {
@@ -52,6 +57,8 @@ export class CaratulasService {
     return caratula;
   }
 
+  // Elimina la carátula por DEIC y rechaza la operación si no se encontró un registro que
+  // borrar.
   async remove(numeroDeic: string): Promise<void> {
     const result = await this.caratulaModel.deleteOne({ numeroDeic });
     if (result.deletedCount === 0) {
@@ -61,6 +68,8 @@ export class CaratulasService {
 
 
   // Servicio 2: Generar el PDF (solo genera y responde)
+  // Valida y normaliza los datos antes de dibujar la carátula en PDF con los identificadores,
+  // personas y formato institucional.
   async generarCaratulaPDF(data: CreateCaratulaDto, res: Response) {
     data.numeroDeic = assertValidCaseNumber(caratulaTipoToCaseNumberTipo(data.tipoCaso), data.numeroDeic);
     data.numeroMp = assertValidCaratulaMpNumber(data.tipoCaso, data.numeroMp);
@@ -303,14 +312,19 @@ export class CaratulasService {
   }
 
 
+  // Consulta las carátulas ordenadas por fecha y aplica el desplazamiento y límite de la página.
   async findPendientesPaginated(skip: number, limit: number): Promise<Caratula[]> {
     return this.caratulaModel.find().sort({ createdAt: -1 }).skip(skip).limit(limit).exec();
   }
   
+  // Cuenta las carátulas almacenadas para calcular la paginación y los indicadores de
+  // pendientes.
   async countPendientes(): Promise<number> {
     return this.caratulaModel.countDocuments();
   }
 
+  // Normaliza nombres, lugar, investigador, observaciones y espacios de las edades antes de
+  // guardar o generar la carátula.
   private normalizeCaratulaText(data: CreateCaratulaDto): void {
     data.nombre = this.toTitleCase(data.nombre);
     data.lugar = this.toTitleCase(data.lugar);
@@ -325,6 +339,8 @@ export class CaratulasService {
     }
   }
 
+  // Separa las listas de nombres y edades y las combina por posición para presentar a cada
+  // persona.
   private namesWithAges(names: string, ages?: string): string[] {
     const nameList = names.split(',').map((name) => name.trim()).filter(Boolean);
     const ageList = ages?.split(',').map((age) => age.trim()).filter(Boolean) ?? [];
@@ -332,10 +348,14 @@ export class CaratulasService {
     return nameList.map((name, index) => this.appendAge(name, ageList[index]));
   }
 
+  // Añade la edad al nombre cuando existe un valor, conservando únicamente el nombre si no se
+  // proporcionó.
   private appendAge(name: string, age?: string): string {
     return age ? `${name}, de ${age} a\u00f1os de edad` : name;
   }
 
+  // Exige el formato de edades correspondiente al tipo de caso y comprueba que las listas de
+  // personas y edades sean compatibles.
   private validateCaratulaAges(data: CreateCaratulaDto): void {
     if (!data.edad) {
       throw new BadRequestException('La edad es requerida para generar la caratula.');
@@ -359,6 +379,8 @@ export class CaratulasService {
     }
   }
 
+  // Normaliza espacios y capitaliza nombres y lugares conservando conectores internos en
+  // minúscula.
   private toTitleCase(value?: string): string {
     if (!value) return '';
 
@@ -382,6 +404,7 @@ export class CaratulasService {
       .join(' ');
   }
 
+  // Normaliza espacios y convierte la primera letra de una observación a mayúscula.
   private toSentenceCase(value?: string): string {
     if (!value) return '';
 
@@ -389,6 +412,8 @@ export class CaratulasService {
     return this.capitalizeWord(normalized);
   }
 
+  // Convierte únicamente la primera letra del texto a mayúscula respetando la configuración de
+  // idioma utilizada.
   private capitalizeWord(value: string): string {
     return value ? value.charAt(0).toLocaleUpperCase('es-GT') + value.slice(1) : value;
   }

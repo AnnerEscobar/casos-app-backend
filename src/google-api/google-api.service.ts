@@ -4,9 +4,12 @@ import { GoogleDriveService } from 'nestjs-googledrive-upload';
 @Injectable()
 export class GoogleApiService {
 
+  // Recibe el servicio de Google Drive configurado para realizar las subidas de archivos.
   constructor(private readonly googleDriveService: GoogleDriveService) { }
 
 
+  // Exige un archivo, lo sube mediante el servicio de Google Drive y devuelve su enlace; informa
+  // los fallos de la carga.
   public async uploadFile(file: Express.Multer.File): Promise<string> {
     try {
       if (!file) {

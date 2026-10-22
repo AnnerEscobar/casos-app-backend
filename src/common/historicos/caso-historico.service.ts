@@ -8,6 +8,8 @@ import { EstadoExpedienteHistorico, OrigenCaso } from './caso-historico.schema';
 
 export interface UsuarioSesion { userId: string; role: UserRole }
 
+// Valida rol, identificadores, estado documental e investigador original antes de incorporar
+// el caso histórico y su PDF opcional sin duplicar el DEIC.
 export async function incorporarHistorico(
   model: Model<any>, tipo: TipoCasoNumero, dto: CasoHistoricoDto,
   datos: Record<string, any>, usuario: UsuarioSesion,
@@ -67,6 +69,8 @@ export async function incorporarHistorico(
 }
 
 // No se infiere el responsable a partir del analista que registra el seguimiento.
+// Valida que el responsable seleccionado sea un investigador activo y construye las
+// referencias del usuario registrador y del investigador asignado.
 export async function auditoriaSeguimiento(model: Model<any>, usuario: UsuarioSesion, asignado?: string) {
   const investigadorId = asignado ?? (usuario.role === UserRole.INVESTIGADOR ? String(usuario.userId) : undefined);
   if (investigadorId) {
@@ -80,6 +84,8 @@ export async function auditoriaSeguimiento(model: Model<any>, usuario: UsuarioSe
   };
 }
 
+// Exige un investigador asignado explícitamente cuando se registra un seguimiento de un
+// expediente histórico.
 export function validarResponsableHistorico(caso: { origenCaso?: string }, auditoria: { investigadorAsignado?: Types.ObjectId }) {
   if (caso.origenCaso === OrigenCaso.HISTORICO && !auditoria.investigadorAsignado) {
     throw new BadRequestException('Seleccione el investigadorAsignado responsable del seguimiento del caso histórico.');

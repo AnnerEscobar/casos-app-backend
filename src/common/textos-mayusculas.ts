@@ -12,6 +12,8 @@ const internos = new Set([
   'indicadoresEstado', 'nombreArchivo', 'originalname', 'filename',
 ]);
 
+// Determina si una ruta contiene texto descriptivo normalizable y excluye identificadores,
+// credenciales, estados y otros valores técnicos.
 function descriptivo(schema: Schema, ruta: string): boolean {
   const partes = ruta.split('.');
   const campo = [...partes].reverse().find(p => !/^\d+$/.test(p)) || '';
@@ -24,6 +26,8 @@ function descriptivo(schema: Schema, ruta: string): boolean {
   return !path?.enumValues?.length && !path?.options?.enum;
 }
 
+// Recorre propiedades y arreglos para visitar los valores de texto con su ruta, sin
+// transformar fechas, referencias ni archivos binarios.
 function recorrer(value: any, ruta: string, visitar: (ruta: string, texto: string) => void): void {
   if (typeof value === 'string') { visitar(ruta, value); return; }
   if (!value || value instanceof Date || Buffer.isBuffer(value) || value._bsontype) return;
@@ -37,13 +41,19 @@ function recorrer(value: any, ruta: string, visitar: (ruta: string, texto: strin
   }
 }
 
+// Construye la presentación original y su versión en mayúsculas únicamente para campos
+// descriptivos permitidos.
 function entrada(schema: Schema, ruta: string, original: string): Originales[string] | undefined {
   if (!descriptivo(schema, ruta)) return;
   return { ruta, original, normalizado: original.toUpperCase() };
 }
 
+// Codifica una ruta como texto hexadecimal para usarla como clave segura en el mapa de
+// presentaciones originales.
 const clave = (ruta: string) => Buffer.from(ruta, 'utf8').toString('hex');
 
+// Restaura un texto solo si su ruta ya existe y mantiene el valor esperado, sin reconstruir
+// campos excluidos por una consulta.
 function asignarExistente(obj: any, ruta: string, original: string, normalizado: string) {
   const partes = ruta.split('.');
   let parent = obj;
@@ -57,6 +67,8 @@ function asignarExistente(obj: any, ruta: string, original: string, normalizado:
   if (parent && Object.prototype.hasOwnProperty.call(parent, key) && parent[key] === normalizado) parent[key] = original;
 }
 
+// Aplica al documento las presentaciones originales guardadas para recuperar la escritura
+// recibida por el backend.
 function restaurar(obj: any) {
   if (!obj) return;
   const raw = obj._doc || obj;
@@ -68,6 +80,8 @@ function restaurar(obj: any) {
   }
 }
 
+// Restaura los textos de objetos y arreglos serializados y retira los metadatos auxiliares
+// antes de exponerlos.
 function presentarPlano(obj: any): any {
   if (!obj || obj instanceof Date || Buffer.isBuffer(obj) || obj._bsontype) return obj;
   if (Array.isArray(obj)) { obj.forEach(presentarPlano); return obj; }
@@ -80,6 +94,8 @@ function presentarPlano(obj: any): any {
 }
 
 /** Se instala antes de compilar cada modelo; también cubre sus subdocumentos. */
+// Instala la normalización de textos al guardar o actualizar y restaura su presentación al
+// consultar, conservando tipos y campos técnicos.
 export function textosMayusculasPlugin(schema: Schema) {
   schema.add({ [PRESENTACION]: { type: Schema.Types.Mixed } });
 
@@ -115,6 +131,8 @@ export function textosMayusculasPlugin(schema: Schema) {
     const transform = anterior.transform;
     schema.set(option, {
       ...anterior,
+      // Restaura la presentación de los textos en la serialización y ejecuta también la
+      // transformación que ya tenía configurada el esquema.
       transform(doc: any, ret: any, opts: any) {
         presentarPlano(ret);
         return typeof transform === 'function' ? transform(doc, ret, opts) : ret;

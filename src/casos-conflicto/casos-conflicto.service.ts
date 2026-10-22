@@ -25,6 +25,8 @@ import { UserRole } from 'src/auth/enums/user-role.enum';
 
 @Injectable()
 export class CasosConflictoService {
+  // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
+  // Conflicto en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialConflictoDto, usuario: UsuarioSesion) {
     if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna el caso inicial de conflicto.');
     await auditoriaSeguimiento(this.casoModel, usuario, dto.investigadorAsignado);
@@ -43,6 +45,8 @@ export class CasosConflictoService {
     }
   }
 
+  // Consulta los registros del proceso de Conflicto y restringe los resultados del investigador
+  // a los expedientes asignados a su cuenta.
   async gestion(usuario: UsuarioSesion) {
     if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
     return this.casoModel.find({ procesoConflicto: true,
@@ -50,6 +54,8 @@ export class CasosConflictoService {
     }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
   }
 
+  // Valida el identificador y consulta un expediente del proceso de Conflicto, permitiendo su
+  // acceso al analista o al investigador asignado.
   async detalleGestion(id: string, usuario: UsuarioSesion) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de conflicto inválido.');
     const caso=await this.casoModel.findById(id);
@@ -58,11 +64,15 @@ export class CasosConflictoService {
     return caso;
   }
 
+  // Guarda los avances de Conflicto solo si el investigador es el asignado y el expediente
+  // admite edición. Conserva los datos anteriores no reemplazados.
   async completar(id: string, dto: CompletarConflictoDto, usuario: UsuarioSesion) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
     if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
     const datos:any={...dto};
+    // Convierte subdocumentos de Mongoose a objetos simples antes de combinar datos guardados con
+    // los cambios recibidos.
     const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
     if('fichaConflicto' in datos) datos.fichaConflicto={...plano(caso.fichaConflicto),...datos.fichaConflicto};
     if(datos.lugarHechos)datos.lugarHechos={...plano(caso.lugarHechos),...datos.lugarHechos};
@@ -75,6 +85,8 @@ export class CasosConflictoService {
     }
   }
 
+  // Comprueba asignación, etapa y datos obligatorios de Conflicto antes de subir el PDF y
+  // registrar el envío del expediente al analista.
   async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
@@ -96,6 +108,8 @@ export class CasosConflictoService {
     }
   }
 
+  // Consulta los expedientes de Conflicto, resuelve los nombres relacionados y genera la base
+  // Excel con el formato del módulo.
   async exportarExcel() {
     const casos=await this.casoModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
     return generarExcelConflictos(casos);
@@ -105,22 +119,30 @@ export class CasosConflictoService {
 
 
 
+  // Adapta los datos históricos de Conflicto al modelo y utiliza el flujo compartido para
+  // validar e incorporar el expediente.
   async incorporarHistorico(dto: CreateHistoricoConflictoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     return incorporarHistorico(this.casoModel, 'conflicto', dto, dto, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
   }
 
 
+  // Asigna al PDF un nombre asociado al DEIC de Conflicto y lo sube a Drive para conservar su
+  // enlace en el expediente.
   private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
     const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
     return this.googleApiService.uploadFile(renamedFile);
   }
 
+  // Recibe el modelo de expedientes de Conflicto y el servicio de Drive utilizado para sus
+  // archivos.
   constructor(
     @InjectModel(CasosConflicto.name) 
     private readonly casoModel: Model<CasosConflictoDocument>,
     private googleApiService: GoogleApiService
   ) {}
 
+// Ejecuta la creación anterior del expediente de Conflicto, validando identificadores, datos y
+// archivo antes de guardarlo.
 async create(
   createCasosConflictoDto: CreateCasosConflictoDto,
   file: Express.Multer.File,
@@ -229,6 +251,8 @@ async create(
   }
 }
 
+ // Consulta los expedientes de Conflicto aprobados y los registros anteriores que todavía no
+ // tienen estado de revisión.
  async findAll(): Promise<CasosConflictoDocument[]> {
 
   try {
@@ -257,6 +281,8 @@ async create(
 }
 
   
+  // Valida que el expediente de Conflicto admita actuaciones y que el responsable sea válido,
+  // sube el archivo y guarda el nuevo seguimiento con control de concurrencia.
   async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
     numeroDeic = normalizeCaseNumber(numeroDeic);
     const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
@@ -299,6 +325,8 @@ async create(
   }
   
   
+// Valida el DEIC y obtiene el expediente de Conflicto permitido por la consulta, incluyendo
+// sus referencias e historial.
 async buscarPorNumeroDeic(
   numeroDeic: string
 ): Promise<CasosConflictoDocument> {
@@ -337,6 +365,8 @@ async buscarPorNumeroDeic(
     return caso;
 }
 
+// Consulta expedientes de Conflicto pendientes de revisión y excluye los del proceso nuevo que
+// el investigador todavía no ha entregado.
 async findPendientes(): Promise<CasosConflictoDocument[]> {
 
   return this.casoModel
@@ -363,6 +393,8 @@ async findPendientes(): Promise<CasosConflictoDocument[]> {
 }
 
 
+// Exige un expediente de Conflicto pendiente y entregado cuando corresponde, registra al
+// analista revisor y añade la aprobación a su historial.
 async aprobarRegistro(
   casoId: string,
   analistaId: string
@@ -428,6 +460,8 @@ async aprobarRegistro(
   return caso;
 }
 
+// Valida que proceda rechazar el expediente de Conflicto, conserva el motivo y añade la
+// decisión del analista al historial.
 async rechazarRegistro(
   casoId: string,
   analistaId: string,
@@ -494,6 +528,8 @@ async rechazarRegistro(
   return caso;
 }
 
+// Consulta los expedientes de Conflicto pendientes o rechazados del investigador: los
+// asignados en el proceso nuevo y los registrados por él en el anterior.
 async findMisRegistros(
   investigadorId: string
 ): Promise<CasosConflictoDocument[]> {
@@ -526,6 +562,8 @@ async findMisRegistros(
 }
 
 
+// Comprueba que el investigador pueda corregir el expediente de Conflicto, conserva el nuevo
+// PDF y registra su reenvío para revisión.
 async reenviarRegistro(
   casoId: string,
   investigadorId: string,
@@ -640,14 +678,20 @@ async reenviarRegistro(
 
   //metodos sin implementar
 
+  // Devuelve una respuesta provisional para el ID de Conflicto; todavía no consulta un
+  // expediente real.
   findOne(id: number) {
     return `This action returns a #${id} casosConflicto`;
   }
 
+  // Devuelve una respuesta provisional para el ID de Conflicto; todavía no modifica expedientes
+  // en la base.
   update(id: number, updateCasosConflictoDto: UpdateCasosConflictoDto) {
     return `This action updates a #${id} casosConflicto`;
   }
 
+  // Devuelve una respuesta provisional para el ID de Conflicto; no elimina expedientes
+  // persistidos.
   remove(id: number) {
     return `This action removes a #${id} casosConflicto`;
   }

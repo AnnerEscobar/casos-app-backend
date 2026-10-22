@@ -6,6 +6,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Usuario, UsuarioDocument } from './entities/auth.entity';
 
+// Busca una cookie por su nombre y decodifica su valor; devuelve null si la cabecera no la
+// contiene.
 const getCookieValue = (cookieHeader: string | undefined, name: string): string | null => {
   if (!cookieHeader) return null;
 
@@ -16,6 +18,8 @@ const getCookieValue = (cookieHeader: string | undefined, name: string): string 
   return decodeURIComponent(match.slice(name.length + 1));
 };
 
+// Obtiene el JWT de la cookie de acceso o, como alternativa, de la cabecera Authorization con
+// esquema Bearer.
 const extractJwtFromRequest = (req: Request): string | null => {
   return (
     getCookieValue(req.headers.cookie, 'access_token') ??
@@ -25,6 +29,8 @@ const extractJwtFromRequest = (req: Request): string | null => {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  // Configura la extracción y validación del JWT con Passport y recibe el modelo de usuarios
+  // para comprobar la sesión persistida.
   constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>) {
     super({
       jwtFromRequest: extractJwtFromRequest,
@@ -34,6 +40,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+ // Verifica que el usuario exista, esté activo y conserve el mismo token de sesión. Devuelve
+ // solo su identidad y expiración para los controladores.
  async validate(req: Request, payload: any) {
   const user = await this.usuarioModel.findById(payload.sub);
   const token = extractJwtFromRequest(req);

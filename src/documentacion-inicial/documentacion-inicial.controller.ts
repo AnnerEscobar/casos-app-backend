@@ -54,17 +54,23 @@ type RequestAutenticado =
 @UseGuards(JwtAuthGuard)
 export class DocumentacionInicialController {
 
+  // Recibe el servicio que administra borradores, plantillas y PDF de la documentación inicial
+  // del expediente.
   constructor(
     private readonly documentacionService:
       DocumentacionInicialService,
   ) {}
 
+  // Comprueba el rol Investigador y solicita el contexto y borrador del expediente para la
+  // identidad autenticada.
   @Get('para-caso/:tipo/:casoId')
   paraCaso(@Param('tipo') tipo: string, @Param('casoId') casoId: string, @Req() req: RequestAutenticado) {
     const usuario = this.getInvestigador(req);
     return this.documentacionService.paraCaso(tipo, casoId, usuario.userId);
   }
 
+  // Valida la identidad investigadora y envía el PDF generado con nombre de archivo y cabeceras
+  // que evitan almacenar una copia en caché.
   @Get(':id/pdf')
   async pdf(@Param('id') id: string, @Req() req: RequestAutenticado, @Res() res: Response) {
     const usuario = this.getInvestigador(req);
@@ -80,6 +86,8 @@ export class DocumentacionInicialController {
      CREAR BORRADOR
   ====================================================== */
 
+  // Crea la documentación inicial usando el identificador y nombre de la sesión, sin aceptar una
+  // identidad proporcionada por el cliente.
   @Post()
   async create(
     @Body()
@@ -111,6 +119,7 @@ export class DocumentacionInicialController {
      TODOS MIS DOCUMENTOS
   ====================================================== */
 
+  // Devuelve la documentación inicial que pertenece al investigador conectado.
   @Get('mis-documentos')
   async findMine(
     @Req()
@@ -132,6 +141,8 @@ export class DocumentacionInicialController {
      MIS PENDIENTES PAGINADOS
   ====================================================== */
 
+  // Valida página y límite y devuelve los borradores pendientes del investigador con el total
+  // necesario para paginar.
   @Get('pendientes')
   async findPendientes(
     @Req()
@@ -240,6 +251,8 @@ export class DocumentacionInicialController {
      HISTORIAL
   ====================================================== */
 
+  // Devuelve los documentos enviados o registrados que forman parte del historial del
+  // investigador.
   @Get('historial')
   async findHistorial(
     @Req()
@@ -261,6 +274,8 @@ export class DocumentacionInicialController {
      OBTENER DOCUMENTACIÓN
   ====================================================== */
 
+  // Consulta una documentación por ID utilizando la identidad autenticada para comprobar su
+  // propiedad y acceso al caso.
   @Get(':id')
   async findOne(
     @Param('id')
@@ -287,6 +302,8 @@ export class DocumentacionInicialController {
      ACTUALIZAR CARÁTULA
   ====================================================== */
 
+  // Envía los cambios validados de la carátula al servicio junto con la identidad del
+  // investigador conectado.
   @Patch(':id/caratula')
   async updateCaratula(
     @Param('id')
@@ -318,6 +335,8 @@ export class DocumentacionInicialController {
      OBTENER PLAN
   ====================================================== */
 
+  // Obtiene la plantilla y los datos guardados del plan para una documentación accesible al
+  // investigador.
   @Get(':id/plan')
   async getPlan(
     @Param('id')
@@ -344,6 +363,8 @@ export class DocumentacionInicialController {
      GUARDAR PLAN
   ====================================================== */
 
+  // Guarda los datos recibidos del plan mediante el servicio, que comprueba propiedad, edición y
+  // códigos de plantilla.
   @Patch(':id/plan')
   async updatePlan(
     @Param('id')
@@ -375,6 +396,8 @@ export class DocumentacionInicialController {
      OBTENER RÚBRICA
   ====================================================== */
 
+  // Obtiene la plantilla y respuestas de la rúbrica correspondiente a la documentación del
+  // investigador.
   @Get(':id/rubrica')
   async getRubrica(
     @Param('id')
@@ -401,6 +424,8 @@ export class DocumentacionInicialController {
      GUARDAR RÚBRICA
   ====================================================== */
 
+  // Solicita guardar las respuestas de rúbrica del investigador y delega las validaciones de
+  // plantilla y edición.
   @Patch(':id/rubrica')
   async updateRubrica(
     @Param('id')
@@ -431,6 +456,8 @@ export class DocumentacionInicialController {
      ELIMINAR BORRADOR
   ====================================================== */
 
+  // Elimina el borrador permitido por el servicio y devuelve la confirmación después de
+  // verificar la identidad investigadora.
   @Delete(':id')
   async removeDraft(
     @Param('id')
@@ -462,6 +489,8 @@ export class DocumentacionInicialController {
      VALIDAR INVESTIGADOR
   ====================================================== */
 
+  // Exige un usuario autenticado con identificador y rol Investigador antes de ejecutar las
+  // operaciones del módulo.
   private getInvestigador(
     req: RequestAutenticado,
   ): UsuarioAutenticado {

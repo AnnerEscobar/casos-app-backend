@@ -5,8 +5,12 @@ import { AUDIT_COLLECTION, ContextoAuditoria, nuevoEvento, verificarFirma } from
 
 @Injectable()
 export class AuditoriaService implements OnModuleInit {
+  // Recibe la conexión MongoDB usada para insertar, consultar y comprobar la configuración de la
+  // bitácora.
   constructor(@InjectConnection() private readonly conexion: Connection) {}
 
+  // Comprueba la clave de firma, las transacciones, los permisos de la cuenta y los índices del
+  // diario. Impide arrancar con una configuración que permita alterar o borrar auditoría.
   async onModuleInit() {
     if (!process.env.AUDIT_HMAC_KEY || Buffer.byteLength(process.env.AUDIT_HMAC_KEY) < 32) {
       throw new Error('Configure AUDIT_HMAC_KEY con al menos 32 bytes y consérvela en un almacén de secretos.');
@@ -36,6 +40,8 @@ export class AuditoriaService implements OnModuleInit {
     }
   }
 
+  // Firma e inserta un evento de auditoría usando la transacción indicada o una escritura
+  // confirmada por la mayoría de réplicas.
   async registrar(contexto: ContextoAuditoria, contenido: Record<string, any>, transaccional = false) {
     const evento = nuevoEvento(contexto, contenido, process.env.AUDIT_HMAC_KEY);
     await this.conexion.collection(AUDIT_COLLECTION).insertOne(evento,
@@ -43,6 +49,8 @@ export class AuditoriaService implements OnModuleInit {
     return evento;
   }
 
+  // Valida los filtros de consulta y construye condiciones MongoDB seguras para usuario,
+  // expediente, fechas y cambios del mismo campo.
   construirFiltro(query: Record<string, string>) {
     const permitidos = new Set(['numeroDeic', 'usuarioId', 'usuario', 'recurso', 'recursoId', 'accion', 'resultado', 'solicitudId', 'desde', 'hasta', 'campo', 'anterior', 'nuevo', 'pagina', 'limite']);
     if (Object.entries(query).some(([k, v]) => !permitidos.has(k) || typeof v !== 'string' || v.length > 512)) {
@@ -54,6 +62,8 @@ export class AuditoriaService implements OnModuleInit {
     }
     // El nombre queda congelado al actuar; no se sustituye con el nombre actual.
     if (query.usuario) filtro['usuario.nombre'] = { $regex: query.usuario.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    // Valida que la fecha del filtro incluya hora y zona horaria en formato ISO 8601 antes de
+    // convertirla a Date.
     const fecha = (valor: string) => {
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})$/.test(valor) || !Number.isFinite(Date.parse(valor))) {
         throw new BadRequestException('Las fechas deben indicar hora y zona horaria ISO 8601.');
@@ -71,6 +81,8 @@ export class AuditoriaService implements OnModuleInit {
     return filtro;
   }
 
+  // Valida la paginación, consulta los eventos ordenados por fecha y devuelve los resultados con
+  // su total y verificación de integridad.
   async buscar(query: Record<string, string>) {
     const pagina = Number(query.pagina || 1), limite = Number(query.limite || 25);
     if (!Number.isInteger(pagina) || pagina < 1 || pagina > 10000 || !Number.isInteger(limite) || limite < 1 || limite > 100) {
@@ -83,11 +95,14 @@ export class AuditoriaService implements OnModuleInit {
     ]);
     return { registros: registros.map(e => this.presentar(e)), total, pagina, limite };
   }
+  // Verifica la firma del evento y prepara su respuesta pública sin exponer la firma almacenada
+  // ni el identificador interno de MongoDB.
   private presentar(evento: any) {
     const integridadValida = verificarFirma(evento, process.env.AUDIT_HMAC_KEY);
     const { _id, firma, ...datos } = evento;
     return { ...datos, integridadValida };
   }
+  // Busca el evento por su UUID y devuelve sus datos verificados; informa si no existe.
   async detalle(eventoId: string) {
     const evento = await this.conexion.collection(AUDIT_COLLECTION).findOne({ eventoId });
     if (!evento) throw new NotFoundException('Evento no encontrado.');

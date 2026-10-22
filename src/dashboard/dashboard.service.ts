@@ -20,6 +20,7 @@ import {
 @Injectable()
 export class DashboardService {
 
+  // Recibe los modelos de casos empleados para calcular los indicadores y gráficos del panel.
   constructor(
 
     @InjectModel(CasosAlerta.name)
@@ -37,6 +38,8 @@ export class DashboardService {
   ) {}
 
 
+  // Construye los indicadores y distribuciones del panel según rol y período, limitando los
+  // datos personales del investigador a sus casos registrados.
   async obtenerDashboard(
     usuario: {
       userId: string;

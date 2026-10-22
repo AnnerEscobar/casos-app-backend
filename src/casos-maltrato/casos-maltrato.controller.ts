@@ -32,8 +32,11 @@ import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('maltratos')
 export class CasosMaltratoController {
+  // Recibe el servicio de Maltrato que valida y ejecuta las operaciones de los expedientes.
   constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
 
+  // Permite al analista abrir y asignar un expediente de Maltrato con los datos iniciales,
+  // usando la identidad de la sesión.
   @Post('registro-inicial')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -41,16 +44,22 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.registrarInicial(dto,req.user);
   }
 
+  // Lista los registros de Maltrato visibles para el analista o los asignados al investigador
+  // conectado.
   @Get('gestion')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   gestion(@Req() req: any) { return this.casosMaltratoService.gestion(req.user); }
 
+  // Solicita el detalle del expediente de Maltrato y delega la comprobación de acceso según el
+  // usuario autenticado.
   @Get('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosMaltratoService.detalleGestion(id,req.user); }
 
+  // Envía los avances del expediente de Maltrato al servicio para que los guarde únicamente el
+  // investigador asignado.
   @Patch('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -58,6 +67,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.completar(id,dto,req.user);
   }
 
+  // Recibe el PDF obligatorio del expediente de Maltrato y solicita su entrega a revisión por el
+  // investigador autenticado.
   @Post('gestion/:id/entregar')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -67,6 +78,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.entregar(id,req.user,file);
   }
 
+  // Genera la base Excel de Maltrato para el analista y envía el archivo con sus cabeceras de
+  // descarga.
   @Get('exportar-excel')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -83,6 +96,8 @@ export class CasosMaltratoController {
   // Apertura normal por analista sin documentos; los históricos conservan su ruta.
   // ─────────────────────────────────────────────
 
+  // Recibe los datos históricos de Maltrato y el PDF opcional para incorporarlos con la
+  // identidad del usuario autorizado.
   @Post('historico')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -97,6 +112,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.incorporarHistorico(dto, req.user, file);
   }
 
+  // Abre el registro inicial de Maltrato por el analista y rechaza archivos, porque el
+  // expediente se entrega posteriormente.
   @Post('crear-maltrato')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -106,11 +123,14 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.registrarInicial(dto,req.user);
   }
 
+  // Entrega el listado de expedientes de Maltrato obtenido por el servicio.
   @Get()
   async findAll(): Promise<CasosMaltratoDocument[]> {
     return this.casosMaltratoService.findAll();
   }
 
+  // Recibe el estado, el responsable y el PDF del seguimiento de Maltrato, y solicita guardarlos
+  // con el usuario autenticado.
   @Patch('seguimiento/:numeroDeic')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -143,11 +163,14 @@ export class CasosMaltratoController {
     );
   }
 
+  // Consulta el expediente de Maltrato identificado por el número DEIC de la petición.
   @Get('buscar/:numeroDeic')
   async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
     return this.casosMaltratoService.buscarPorNumeroDeic(numeroDeic);
   }
 
+  // Devuelve los expedientes de Maltrato que el analista puede revisar mediante la ruta
+  // protegida para ese rol.
   @Get('pendientes-autorizacion')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -155,6 +178,7 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.findPendientes();
   }
 
+  // Solicita aprobar el expediente de Maltrato y registra como revisor al analista autenticado.
   @Patch(':id/aprobar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -162,6 +186,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.aprobarRegistro(id, req.user.userId);
   }
 
+  // Solicita rechazar el expediente de Maltrato con el motivo recibido y la identidad del
+  // analista que decide.
   @Patch(':id/rechazar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -178,6 +204,8 @@ export class CasosMaltratoController {
   }
 
   //investigador puede ver sus propios registros
+  // Consulta los registros de Maltrato correspondientes al investigador autenticado, usando su
+  // ID de sesión.
   @Get('mis-registros')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -185,6 +213,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.findMisRegistros(req.user.userId);
   }
 
+  // Recibe el PDF corregido y solicita reenviar el expediente de Maltrato con la identidad del
+  // investigador conectado.
   @Patch(':id/reenviar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -212,11 +242,15 @@ export class CasosMaltratoController {
 
   //casos sin implemententar
 
+  // Delega en la consulta provisional por ID de Maltrato; todavía devuelve un mensaje de
+  // ejemplo.
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.casosMaltratoService.findOne(+id);
   }
 
+  // Delega en la actualización provisional por ID de Maltrato, que todavía no modifica
+  // documentos.
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -225,6 +259,8 @@ export class CasosMaltratoController {
     return this.casosMaltratoService.update(+id, updateCasosMaltratoDto);
   }
 
+  // Delega en el método provisional de eliminación de Maltrato; ese método no borra expedientes
+  // de la base.
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.casosMaltratoService.remove(+id);

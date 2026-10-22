@@ -9,12 +9,16 @@ import { GoogleApiService } from 'src/google-api/google-api.service';
 @Injectable()
 export class InformesService {
 
+  // Recibe el modelo de informes y el servicio de Google Drive utilizado para sus PDF y
+  // ampliaciones.
   constructor(
     @InjectModel(Informe.name)
     private readonly informeModel: Model<InformeDocument>,
     private readonly googleApiService: GoogleApiService
   ) {}
 
+  // Comprueba la correspondencia entre tipo y DEIC, impide duplicados y guarda el informe como
+  // borrador.
   async crear(dto: CreateInformeDto): Promise<Informe> {
     this.validarFormatoDisponible(dto);
 
@@ -27,6 +31,8 @@ export class InformesService {
     return nuevo.save();
   }
 
+  // Comprueba que el prefijo DEIC coincida con el tipo de informe antes de usar su formato
+  // institucional.
   private validarFormatoDisponible(dto: CreateInformeDto): void {
     const tipoInforme = dto.tipoInforme?.toLowerCase();
     const numeroDeic = dto.numeroDeic?.trim().toUpperCase();
@@ -42,20 +48,25 @@ export class InformesService {
     }
   }
 
+  // Consulta los informes ordenados del más reciente al más antiguo.
   async obtenerTodos(): Promise<Informe[]> {
     return this.informeModel.find().sort({ createdAt: -1 }).exec();
   }
 
+  // Busca el informe por DEIC y rechaza la consulta si no existe.
   async obtenerPorDeic(numeroDeic: string): Promise<Informe> {
     const informe = await this.informeModel.findOne({ numeroDeic });
     if (!informe) throw new NotFoundException('Informe no encontrado.');
     return informe;
   }
 
+  // Consulta los informes en estado pendiente de registro ordenados por fecha de creación.
   async obtenerPendientes(): Promise<Informe[]> {
     return this.informeModel.find({ estado: 'pendiente_registro' }).sort({ createdAt: -1 }).exec();
   }
 
+  // Actualiza los campos recibidos de las secciones del informe y conserva los ya guardados
+  // cuando no se proporcionan reemplazos.
   async actualizarSeccion(numeroDeic: string, dto: UpdateInformeDto): Promise<Informe> {
     const informe = await this.informeModel.findOne({ numeroDeic });
     if (!informe) throw new NotFoundException('Informe no encontrado.');
@@ -79,6 +90,7 @@ export class InformesService {
     return informe.save();
   }
 
+  // Busca el informe y actualiza su estado a pendiente de registro.
   async marcarPendienteRegistro(numeroDeic: string): Promise<Informe> {
     const informe = await this.informeModel.findOne({ numeroDeic });
     if (!informe) throw new NotFoundException('Informe no encontrado.');
@@ -86,6 +98,8 @@ export class InformesService {
     return informe.save();
   }
 
+  // Busca el informe, sube el PDF cuando se adjunta y guarda su enlace junto con el estado de
+  // registro correspondiente.
   async registrarConPdf(
     numeroDeic: string,
     pdfFile: Express.Multer.File,
@@ -112,6 +126,8 @@ export class InformesService {
     return informe.save();
   }
 
+  // Añade al informe una ampliación con sus datos y el enlace del archivo opcional subido a
+  // Drive.
   async agregarAmpliacion(
     numeroDeic: string,
     descripcion: string,
@@ -135,6 +151,7 @@ export class InformesService {
     return informe.save();
   }
 
+  // Borra el informe por DEIC e informa si no existía un registro para eliminar.
   async eliminar(numeroDeic: string): Promise<{ message: string }> {
     const resultado = await this.informeModel.deleteOne({ numeroDeic });
     if (resultado.deletedCount === 0) throw new NotFoundException('Informe no encontrado.');

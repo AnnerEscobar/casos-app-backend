@@ -7,10 +7,12 @@ import { JwtAuthGuard } from 'src/auth/Guards/jwt-auth.guard';
 @Controller('google-drive')
 export class GoogleApiController {
 
+  // Recibe el servicio que envía archivos al almacenamiento configurado en Google Drive.
   constructor(private readonly googleApiService: GoogleApiService) { }
 
 
   // Endpoint para subir cualquier archivo
+  // Recibe el archivo cargado por la ruta y delega su envío a Google Drive.
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(@UploadedFile() file: Express.Multer.File) {

@@ -19,6 +19,8 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosAlertaService {
+  // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
+  // Alerta en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialAlertaDto, usuario: UsuarioSesion) {
     if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna la alerta inicial.');
     await auditoriaSeguimiento(this.casosAlertaModel, usuario, dto.investigadorAsignado);
@@ -37,6 +39,8 @@ export class CasosAlertaService {
     }
   }
 
+  // Consulta los registros del proceso de Alerta y restringe los resultados del investigador a
+  // los expedientes asignados a su cuenta.
   async gestion(usuario: UsuarioSesion) {
     if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
     return this.casosAlertaModel.find({ procesoAlerta: true,
@@ -44,6 +48,8 @@ export class CasosAlertaService {
     }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
   }
 
+  // Valida el identificador y consulta un expediente del proceso de Alerta, permitiendo su
+  // acceso al analista o al investigador asignado.
   async detalleGestion(id: string, usuario: UsuarioSesion) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de alerta inválido.');
     const caso=await this.casosAlertaModel.findById(id);
@@ -52,11 +58,15 @@ export class CasosAlertaService {
     return caso;
   }
 
+  // Guarda los avances de Alerta solo si el investigador es el asignado y el expediente admite
+  // edición. Conserva los datos anteriores no reemplazados.
   async completar(id: string, dto: CompletarAlertaDto, usuario: UsuarioSesion) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
     if(!caso.expedienteEnPreparacion && caso.estadoRegistro!==EstadoRegistro.RECHAZADO) throw new ConflictException('El expediente ya se envió a revisión.');
     const datos={...dto};
+    // Convierte subdocumentos de Mongoose a objetos simples antes de combinar datos guardados con
+    // los cambios recibidos.
     const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
     // Las observaciones del analista se preservan durante la edición del investigador.
     if('fichaAlerta' in datos) datos.fichaAlerta={...plano(caso.fichaAlerta),...datos.fichaAlerta,observacionesAnalista:caso.fichaAlerta?.observacionesAnalista};
@@ -71,6 +81,8 @@ export class CasosAlertaService {
     }
   }
 
+  // Comprueba asignación, etapa y datos obligatorios de Alerta antes de subir el PDF y registrar
+  // el envío del expediente al analista.
   async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
@@ -91,11 +103,15 @@ export class CasosAlertaService {
     }
   }
 
+  // Consulta los expedientes de Alerta, resuelve los nombres relacionados y genera la base Excel
+  // con el formato del módulo.
   async exportarExcel() {
     const casos=await this.casosAlertaModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
     return generarExcelAlertas(casos);
   }
 
+  // Adapta los datos históricos de Alerta al modelo y utiliza el flujo compartido para validar e
+  // incorporar el expediente.
   async incorporarHistorico(dto: CreateHistoricoAlertaDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     const { lugarDesaparicion, datosLocalizacion, ...datos } = dto;
     return incorporarHistorico(this.casosAlertaModel, 'alerta', dto, {
@@ -109,6 +125,8 @@ export class CasosAlertaService {
   }
 
 
+  // Asigna al PDF un nombre asociado al DEIC de Alerta y lo sube a Drive para conservar su
+  // enlace en el expediente.
   private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
     const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
     const uploadedUrl = await this.googleApiService.uploadFile(renamedFile);
@@ -119,6 +137,8 @@ export class CasosAlertaService {
     return `https://drive.google.com/uc?export=download&id=${extractedFileId}`;
   }
 
+  // Recibe el modelo de expedientes de Alerta y el servicio de Drive utilizado para sus
+  // archivos.
   constructor(
     @InjectModel(CasosAlerta.name)
     private readonly casosAlertaModel: Model<CasosAlertaDocument>,
@@ -127,6 +147,8 @@ export class CasosAlertaService {
 
 
   //Metodo para crear un caso
+  // Ejecuta la creación anterior del expediente de Alerta, validando identificadores, datos y
+  // archivo antes de guardarlo.
   async create(
     createCasosAlertaDto: CreateCasosAlertaDto,
     file: Express.Multer.File,
@@ -264,6 +286,8 @@ export class CasosAlertaService {
   }
 
   //cruds creados por el nestjsd
+  // Consulta los expedientes de Alerta aprobados y los registros anteriores que todavía no
+  // tienen estado de revisión.
   async findAll(): Promise<CasosAlerta[]> {
     try {
       const alertas = await this.casosAlertaModel.find({
@@ -286,6 +310,8 @@ export class CasosAlertaService {
   }
 
   // Método para buscar alertas por número de expediente MP
+  // Normaliza el MP y consulta las alertas aprobadas o anteriores sin estado de revisión;
+  // informa si no encuentra coincidencias.
   async buscarPorNumeroMp(
     numeroMp: string
   ): Promise<CasosAlerta[]> {
@@ -322,6 +348,8 @@ export class CasosAlertaService {
 
   //metodo para agregar un seguimiento a un caso
 
+  // Valida el estado y responsable del seguimiento de Alerta, incorpora sus archivos y guarda la
+  // actuación con protección frente a cambios concurrentes.
   async actualizarCasoConSeguimiento(
     numeroDeic: string,
     dto: UpdateCasosAlertaDto,
@@ -378,6 +406,8 @@ export class CasosAlertaService {
     return { message: 'Seguimiento agregado correctamente', seguimiento: caso.seguimientos[caso.seguimientos.length - 1] };
   }
 
+  // Valida el DEIC y obtiene el expediente de Alerta permitido por la consulta, incluyendo sus
+  // referencias e historial.
   async buscarPorNumeroDeic(
     numeroDeic: string
   ): Promise<CasosAlerta> {
@@ -417,6 +447,8 @@ export class CasosAlertaService {
   }
 
 
+  // Consulta expedientes de Alerta pendientes de revisión y excluye los del proceso nuevo que el
+  // investigador todavía no ha entregado.
   async findPendientes(): Promise<CasosAlertaDocument[]> {
 
     return this.casosAlertaModel
@@ -443,6 +475,8 @@ export class CasosAlertaService {
       .exec();
   }
 
+  // Exige un expediente de Alerta pendiente y entregado cuando corresponde, registra al analista
+  // revisor y añade la aprobación a su historial.
   async aprobarRegistro(
     casoId: string,
     analistaId: string
@@ -496,6 +530,8 @@ export class CasosAlertaService {
   }
 
 
+  // Valida que proceda rechazar el expediente de Alerta, conserva el motivo y añade la decisión
+  // del analista al historial.
   async rechazarRegistro(
     casoId: string,
     analistaId: string,
@@ -550,6 +586,8 @@ export class CasosAlertaService {
   }
 
 
+  // Consulta los expedientes de Alerta pendientes o rechazados del investigador: los asignados
+  // en el proceso nuevo y los registrados por él en el anterior.
   async findMisRegistros(
 
     investigadorId: string
@@ -592,6 +630,8 @@ export class CasosAlertaService {
 
   //termina metodo para buscar mis registros
 
+  // Comprueba que el investigador pueda corregir el expediente de Alerta, conserva el nuevo PDF
+  // y registra su reenvío para revisión.
   async reenviarRegistro(
     casoId: string,
     investigadorId: string,

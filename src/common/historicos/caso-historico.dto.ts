@@ -6,6 +6,8 @@ import { EstadoExpedienteHistorico, FuenteInformacionHistorica, OrigenCaso } fro
 
 // Los formularios normales envían objetos/arreglos como JSON en multipart.
 // Conserva también las peticiones JSON históricas y su validación anidada.
+// Transforma campos históricos enviados como texto JSON a la clase indicada y rechaza el
+// contenido que no se pueda interpretar.
 export function JsonHistorico(tipo: () => ClassConstructor<object>): PropertyDecorator {
   return Transform(({ value, key }) => {
     if (typeof value !== 'string') return value;

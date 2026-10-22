@@ -8,8 +8,48 @@ import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestio
 import { UserRole } from '../auth/enums/user-role.enum';
 import { generarExcelConflictos, filasConflicto } from './conflicto-excel';
 import headers = require('./conflicto-excel-encabezados.json');
+import { Test } from '@nestjs/testing';
+import request = require('supertest');
+import { JwtAuthGuard } from '../auth/Guards/jwt-auth.guard';
 import { CasosConflictoController } from './casos-conflicto.controller';
 import { ROLES_KEY } from '../auth/decorators/roles.decorator';
+
+describe('Rutas de registros de conflicto', () => {
+  let app: any;
+  let usuario: { userId: string; role: UserRole };
+  const api = {
+    findMisRegistros: jest.fn(), findPendientes: jest.fn(), findOne: jest.fn(),
+    aprobarRegistro: jest.fn(), rechazarRegistro: jest.fn(),
+  };
+  beforeAll(async () => {
+    const modulo = await Test.createTestingModule({ controllers: [CasosConflictoController], providers: [{ provide: CasosConflictoService, useValue: api }] })
+      .overrideGuard(JwtAuthGuard).useValue({ canActivate: (ctx: any) => { ctx.switchToHttp().getRequest().user = usuario; return true; } }).compile();
+    app = modulo.createNestApplication(); await app.init();
+  });
+  beforeEach(() => { usuario = investigador; jest.clearAllMocks(); });
+  afterAll(async () => { await app.close(); });
+  it('mis-registros devuelve JSON del investigador y no cae en el placeholder :id', async () => {
+    api.findMisRegistros.mockResolvedValue([{ _id: 'asignado', procesoConflicto: true, expedienteEnPreparacion: true }]);
+    const res = await request(app.getHttpServer()).get('/conflictos/mis-registros').expect(200);
+    expect(res.body).toEqual([{ _id: 'asignado', procesoConflicto: true, expedienteEnPreparacion: true }]);
+    expect(api.findMisRegistros).toHaveBeenCalledWith(investigador.userId); expect(api.findOne).not.toHaveBeenCalled();
+  });
+  it('pendientes-autorizacion es del analista y no cae en :id', async () => {
+    usuario = analista; api.findPendientes.mockResolvedValue([]);
+    await request(app.getHttpServer()).get('/conflictos/pendientes-autorizacion').expect(200, []);
+    expect(api.findOne).not.toHaveBeenCalled();
+  });
+  it('rechaza roles incorrectos sin consultar datos', async () => {
+    usuario = analista; await request(app.getHttpServer()).get('/conflictos/mis-registros').expect(403);
+    usuario = investigador; await request(app.getHttpServer()).get('/conflictos/pendientes-autorizacion').expect(403);
+    expect(api.findMisRegistros).not.toHaveBeenCalled(); expect(api.findPendientes).not.toHaveBeenCalled();
+  });
+  it('la revisión usa la identidad autenticada del analista', async () => {
+    usuario = analista; api.aprobarRegistro.mockResolvedValue({ estadoRegistro: 'Aprobado' });
+    await request(app.getHttpServer()).patch('/conflictos/caso/aprobar-registro').send({}).expect(200);
+    expect(api.aprobarRegistro).toHaveBeenCalledWith('caso', analista.userId);
+  });
+});
 
 describe('Excel de conflicto',()=>{
   const caso={numeroDeic:'DEIC53-2026-10-09-001',fechaIngreso:'2026-10-09',infractores:[{nombre:'Primero',edadReportada:0,alias:'Uno',sexo:'HOMBRE'},{nombre:'Segundo',edadReportada:17,alias:'Dos',sexo:'MUJER'},{nombre:'Tercero',edadReportada:18}],victimas:[{nombre:'Denunciante',telefono:'123',direccion:'Dirección'}],fichaConflicto:{fechaAsignacion:'2026-10-01',fechaPrimerInforme:'2026-10-04',fechaEntregaAnalisis:'2026-10-09',folios:0,entrevistas:2,columnaAdicional:'=texto'},fileUrls:['https://ejemplo.test/pdf']};

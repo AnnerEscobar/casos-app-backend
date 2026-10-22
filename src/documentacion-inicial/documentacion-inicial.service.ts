@@ -40,31 +40,39 @@ import { generarDocumentacionPdf } from './documentacion-pdf';
 @Injectable()
 export class DocumentacionInicialService {
 
+  // Recibe el modelo de documentación inicial y su conexión para consultar también el caso
+  // vinculado.
   constructor(
     @InjectModel(DocumentacionInicial.name)
     private readonly documentacionModel: Model<DocumentacionInicialDocument>,
   ) {}
 
+  // Valida el tipo e ID del caso y comprueba que el investigador de la sesión sea el asignado,
+  // comparando el valor de sus identificadores.
   private async casoAsignado(tipo: string, casoId: string, investigadorId: string) {
     const modelos = { Alerta: 'CasosAlerta', Maltrato: 'CasosMaltrato', Conflicto: 'CasosConflicto' };
     if (!modelos[tipo] || !Types.ObjectId.isValid(casoId)) throw new BadRequestException('El caso indicado no es válido.');
     const caso = await this.documentacionModel.db.model(modelos[tipo]).findById(casoId).populate('investigadorAsignado', 'nombre');
     if (!caso) throw new NotFoundException('No se encontró el caso asignado.');
-    if (String(caso.investigadorAsignado?._id || caso.investigadorAsignado) !== investigadorId) {
+    if (!Types.ObjectId.isValid(investigadorId) || String(caso.investigadorAsignado?._id || caso.investigadorAsignado) !== String(investigadorId)) {
       throw new ForbiddenException('Solo el investigador asignado puede preparar estos documentos.');
     }
     return caso;
   }
 
+  // Recupera el expediente y su borrador compatible, precarga los datos disponibles y determina
+  // si la etapa actual permite editar los documentos.
   async paraCaso(tipo: string, casoId: string, investigadorId: string) {
     const caso = await this.casoAsignado(tipo, casoId, investigadorId);
     const documentacion = await this.documentacionModel.findOne({ numeroDeic: caso.numeroDeic });
-    if (documentacion && (String(documentacion.investigadorId) !== investigadorId || documentacion.tipoCaso !== tipo ||
+    if (documentacion && (String(documentacion.investigadorId) !== String(investigadorId) || documentacion.tipoCaso !== tipo ||
       (documentacion.casoId && documentacion.casoId !== casoId))) {
       throw new ConflictException('El DEIC ya tiene documentación de otro expediente o investigador.');
     }
     const personas = tipo === 'Alerta' ? [{ nombre: caso.nombreDesaparecido, fecha_Nac: caso.fecha_Nac, edadReportada: caso.fichaAlerta?.edadReportada }]
       : tipo === 'Maltrato' ? caso.victimas || [] : caso.infractores || [];
+    // Conserva una edad reportada o calcula la edad a la fecha de ingreso cuando existen ambas
+    // fechas, sin inventar datos desconocidos.
     const edad = (persona: any) => {
       if (persona.edadReportada != null) return String(persona.edadReportada);
       if (!persona.fecha_Nac || !caso.fechaIngreso) return '';
@@ -87,6 +95,8 @@ export class DocumentacionInicialService {
     };
   }
 
+  // Exige una carátula válida, un plan completo y las respuestas de la rúbrica antes de generar
+  // el PDF imprimible sin entregar el caso.
   async generarPdf(id: string, investigadorId: string) {
     const doc = await this.findOne(id, investigadorId);
     // Consultar e imprimir no constituye una entrega ni modifica su estado.
@@ -108,6 +118,8 @@ export class DocumentacionInicialService {
    OBTENER PLANTILLA / DATOS DEL PLAN
 ====================================================== */
 
+// Comprueba el acceso a la documentación y devuelve el plan preparado con su plantilla y datos
+// guardados.
 async getPlanPaso(
   id: string,
   investigadorId: string,
@@ -122,6 +134,8 @@ async getPlanPaso(
   return this.planDocumento(documentacion);
 }
 
+// Combina los elementos de la plantilla del tipo de caso con la información ya guardada,
+// identificándolos por su código.
 private planDocumento(documentacion: DocumentacionInicialDocument) {
 
 
@@ -205,6 +219,8 @@ private planDocumento(documentacion: DocumentacionInicialDocument) {
    OBTENER PLANTILLA / DATOS DE RÚBRICA
 ====================================================== */
 
+// Comprueba el acceso a la documentación y devuelve la rúbrica con su plantilla y respuestas
+// guardadas.
 async getRubricaPaso(
   id: string,
   investigadorId: string,
@@ -219,6 +235,8 @@ async getRubricaPaso(
   return this.rubricaDocumento(documentacion);
 }
 
+// Selecciona la rúbrica por tipo y modalidad y completa sus ítems con las respuestas
+// existentes sin alterar la plantilla.
 private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
 
 
@@ -328,6 +346,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      CREAR DOCUMENTACIÓN INICIAL / BORRADOR
   ====================================================== */
 
+  // Valida identificadores y asignación, evita documentación duplicada y crea un borrador
+  // inicial vinculado al caso cuando corresponde.
   async create(
     dto: CreateDocumentacionInicialDto,
     investigadorId: string,
@@ -470,6 +490,7 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      OBTENER MIS DOCUMENTOS
   ====================================================== */
 
+  // Consulta todos los documentos del investigador y los ordena por su última modificación.
   async findMine(
     investigadorId: string,
   ): Promise<DocumentacionInicial[]> {
@@ -489,6 +510,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      PENDIENTES DEL INVESTIGADOR
   ====================================================== */
 
+  // Devuelve una página de documentos del investigador en borrador, pendientes de registro o
+  // rechazados, ordenados por actualización.
   async findMisPendientesPaginated(
     investigadorId: string,
     skip: number,
@@ -516,6 +539,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
   }
 
 
+  // Cuenta los documentos pendientes del investigador usando los mismos estados del listado
+  // paginado.
   async countMisPendientes(
     investigadorId: string,
   ): Promise<number> {
@@ -540,6 +565,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      HISTORIAL
   ====================================================== */
 
+  // Consulta los documentos del investigador enviados a revisión o registrados y los ordena por
+  // actualización.
   async findMiHistorial(
     investigadorId: string,
   ): Promise<DocumentacionInicial[]> {
@@ -566,6 +593,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      OBTENER UNA DOCUMENTACIÓN
   ====================================================== */
 
+  // Busca una documentación perteneciente al investigador y comprueba su acceso al expediente
+  // asociado antes de devolverla.
   async findOne(
     id: string,
     investigadorId: string,
@@ -611,6 +640,8 @@ private rubricaDocumento(documentacion: DocumentacionInicialDocument) {
      CARÁTULA
   ====================================================== */
 
+// Comprueba que el borrador sea editable, valida su vínculo con el expediente y actualiza la
+// carátula sin permitir cambiar el DEIC vinculado.
 async updateCaratula(
   id: string,
   investigadorId: string,
@@ -755,6 +786,8 @@ async updateCaratula(
      PASO 2
      PLAN DE INVESTIGACIÓN
   ====================================================== */
+// Valida los códigos contra la plantilla del caso y guarda los avances del plan únicamente si
+// la documentación es editable.
 async updatePlan(
   id: string,
   investigadorId: string,
@@ -882,6 +915,8 @@ async updatePlan(
      RÚBRICA
   ====================================================== */
 
+// Valida respuestas y códigos de los ítems de la rúbrica correspondiente y guarda sus avances
+// cuando se permite editar.
 async updateRubrica(
   id: string,
   investigadorId: string,
@@ -1034,6 +1069,8 @@ async updateRubrica(
      GUARDAR PDF FINAL
   ====================================================== */
 
+  // Comprueba que existan plan y rúbrica antes de guardar los datos del documento final y
+  // actualizar el avance del borrador.
   async saveDocumentoFinal(
     id: string,
     investigadorId: string,
@@ -1101,6 +1138,7 @@ async updateRubrica(
      CUANDO EL INVESTIGADOR REGISTRA EL CASO
   ====================================================== */
 
+  // Exige documentación pendiente de registro y la vincula al caso al pasarla a revisión.
   async marcarEnRevision(
     id: string,
     investigadorId: string,
@@ -1135,6 +1173,7 @@ async updateRubrica(
      REGISTRO RECHAZADO
   ====================================================== */
 
+  // Busca la documentación y la marca como rechazada para reflejar la decisión de revisión.
   async marcarRechazado(
     id: string,
   ): Promise<DocumentacionInicial> {
@@ -1162,6 +1201,7 @@ async updateRubrica(
      REGISTRO APROBADO
   ====================================================== */
 
+  // Busca la documentación, la marca como registrada y conserva la referencia del caso asociado.
   async marcarRegistrado(
     id: string,
     casoId: string,
@@ -1192,6 +1232,8 @@ async updateRubrica(
      ELIMINAR BORRADOR
   ====================================================== */
 
+  // Elimina únicamente documentación en borrador que pertenezca al investigador y siga siendo
+  // editable según el caso vinculado.
   async removeDraft(
     id: string,
     investigadorId: string,
@@ -1221,6 +1263,8 @@ async updateRubrica(
      VALIDAR SI PUEDE EDITARSE
   ====================================================== */
 
+  // Bloquea cambios en documentos registrados o en revisión y en expedientes ya entregados,
+  // salvo cuando el rechazo habilita correcciones.
   private async assertEditable(
     documentacion: DocumentacionInicialDocument,
   ): Promise<void> {
@@ -1245,6 +1289,8 @@ async updateRubrica(
      NORMALIZAR CARÁTULA
   ====================================================== */
 
+  // Crea una copia de la carátula con nombres, lugares, observaciones y espacios normalizados
+  // para su presentación.
   private normalizeCaratula(
     data: Partial<DatosCaratula>,
   ): DatosCaratula {
@@ -1304,6 +1350,8 @@ async updateRubrica(
      TITLE CASE
   ====================================================== */
 
+  // Normaliza el texto y capitaliza nombres o lugares respetando conectores internos en
+  // minúscula.
   private toTitleCase(
     value?: string,
   ): string {
@@ -1364,6 +1412,7 @@ async updateRubrica(
      SENTENCE CASE
   ====================================================== */
 
+  // Normaliza espacios y presenta las observaciones con mayúscula inicial.
   private toSentenceCase(
     value?: string,
   ): string {
@@ -1390,6 +1439,7 @@ async updateRubrica(
      CAPITALIZAR
   ====================================================== */
 
+  // Convierte la primera letra a mayúscula manteniendo el resto del texto recibido.
   private capitalizeWord(
     value: string,
   ): string {

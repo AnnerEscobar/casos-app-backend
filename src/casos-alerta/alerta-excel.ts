@@ -3,14 +3,23 @@ import encabezados = require('./alerta-excel-encabezados.json');
 
 const dias = ['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
 const meses = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+// Convierte una fecha disponible a su día en UTC para exportarla como fecha de Excel y deja
+// sin valor las fechas inválidas.
 const fecha = (value: any): Date | undefined => {
   if (!value) return undefined;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? undefined : new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));
 };
+// Obtiene el nombre de una referencia poblada y deja vacío el dato cuando no está disponible.
 const nombre = (value: any) => value?.nombre || '';
+// Calcula la diferencia de días entre dos fechas disponibles para las columnas de plazos del
+// archivo.
 const diferencia = (a: any,b: any) => a && b ? Math.floor((new Date(b).getTime()-new Date(a).getTime())/86400000) : undefined;
+// Representa los datos ausentes como celdas vacías sin convertir los ceros o booleanos válidos
+// en valores faltantes.
 const valor = (v: any) => v === undefined || v === null ? '' : v;
+// Copia el caso e incorpora los últimos datos de localización disponibles en los seguimientos
+// para exportar su información actualizada.
 function conLocalizacionActual(caso:any) {
   const c={...caso};
   for(const seguimiento of caso.seguimientos || []) {
@@ -21,6 +30,8 @@ function conLocalizacionActual(caso:any) {
   return c;
 }
 
+// Construye la fila de Alerta con el orden de columnas de la referencia, calculando la edad a
+// la recepción cuando existen las fechas necesarias.
 export function filaDesaparecido(c: any, orden: number): any[] {
   const f = c.fichaAlerta || {};
   const ingreso = fecha(c.fechaIngreso); // No se sustituye por createdAt: no representa la recepción.
@@ -42,6 +53,8 @@ export function filaDesaparecido(c: any, orden: number): any[] {
   return [orden,f.delegacion,c.numeroDeic,c.numeroMp,ingreso,ingreso && dias[ingreso.getUTCDay()],ingreso && meses[ingreso.getUTCMonth()],c.numeroAlerta,f.tipoAlerta,c.nombreDesaparecido,nacimiento,edad,edad==null?'':edad<18?'MENOR':'MAYOR',f.sexo,f.etnia,f.comunidadLgbtiq,f.discapacidad,f.nacionalidad,f.profesion,f.caracteristicasFisicas,f.vestimenta,f.presuntoResponsable,f.relacionResponsable,desaparicion,desaparicion && dias[desaparicion.getUTCDay()],desaparicion && meses[desaparicion.getUTCMonth()],desaparicion?.getUTCFullYear(),f.horaDesaparicion,f.referenciaLugar,c.direccion?.direccionDetallada,f.sector,f.zonaDesaparicion,c.direccion?.departamento,c.direccion?.municipio,f.tipoLugar,f.motivoDesaparicion,f.estatusLocalizacion,plazo,f.unidadLocalizo,f.institucionLocalizo,f.condicionLocalizacion,f.causaFallecimiento,f.resenaDesaparicion,fecha(f.fechaInformado),f.numeroOficio,c.estadoInvestigacion,f.clasificacionCaso,f.situacionAlerta,f.observaciones,investigador,f.observacionesAnalista,rango,...counts,fecha(f.fechaDesactivacion),fecha(f.fechaEntregaAnalisis),diferencia(c.fechaIngreso,f.fechaEntregaAnalisis),f.observacionesAdicionales].map(valor);
 }
 
+// Añade encabezados, filtros, paneles inmovilizados y estilos de presentación a una hoja del
+// libro de alertas.
 function configurar(sheet: Worksheet, headers: string[]) {
   sheet.addRow(headers);
   sheet.views = [{state:'frozen',ySplit:1,xSplit:3}];
@@ -55,6 +68,8 @@ function configurar(sheet: Worksheet, headers: string[]) {
   sheet.columns.forEach((col,i)=>{col.width=headers[i].length>140?58:headers[i].length>70?40:i===9?53:24;});
 }
 
+// Genera las hojas de desaparecidos y localizados con los encabezados originales y exporta el
+// libro a un archivo Excel en memoria.
 export async function generarExcelAlertas(casos: any[]): Promise<Buffer> {
   const workbook = new Workbook();
   workbook.creator='SGIC';

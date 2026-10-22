@@ -1,11 +1,17 @@
 import { Workbook } from 'exceljs';
 import headers = require('./maltrato-excel-encabezados.json');
 
+// Convierte una fecha disponible a su día en UTC para exportarla como fecha de Excel y deja
+// sin valor las fechas inválidas.
 const fecha=(v:any):Date|null=>{
   if(!v)return null;
   const d=new Date(v);return Number.isNaN(d.getTime())?null:new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()));
 };
+// Representa los datos ausentes como celdas vacías sin convertir los ceros o booleanos válidos
+// en valores faltantes.
 const valor=(v:any)=>v==null?'':v;
+// Calcula la edad de la víctima a la recepción cuando conoce nacimiento e ingreso; en caso
+// contrario conserva la edad reportada.
 export function edadMaltrato(v:any,ingreso:any):number|null {
   const nacimiento=fecha(v.fecha_Nac),recepcion=fecha(ingreso);
   if(nacimiento && recepcion){
@@ -14,8 +20,12 @@ export function edadMaltrato(v:any,ingreso:any):number|null {
   }
   return v.edadReportada??null;
 }
+// Genera una fila por víctima con los datos del expediente y sindicados, evitando repetir
+// cantidades sumables en las filas adicionales.
 export function filasMaltrato(c:any,ordenInicial=1):any[][] {
   const f=c.fichaMaltrato||{},sindicados=c.infractores||c.sindicados||[],lugar=c.lugarHechos||{};
+  // Reúne los valores de un mismo campo de los sindicados con saltos de línea y marca los datos
+  // faltantes sin cambiar su orden.
   const unir=(key:string)=>sindicados.map((s:any)=>s[key]||'Sin indicar').join('\n');
   const ingreso=fecha(c.fechaIngreso),entrega=fecha(f.fechaEntregaAnalisis);
   const dias=ingreso && entrega && entrega>=ingreso?Math.round((entrega.getTime()-ingreso.getTime())/86400000):null;
@@ -27,6 +37,8 @@ export function filasMaltrato(c:any,ordenInicial=1):any[][] {
     return [ordenInicial+i,f.procedencia,f.tipoDocumento,c.numeroMp,c.numeroDeic,fecha(f.fechaDocumento),ingreso,f.unidadConoce,investigador,v.denuncianteNombre,v.denuncianteTelefono,v.denuncianteParentesco,v.nombre,v.etnia,edad,edad==null?'':edad<18?'MENOR':'MAYOR',v.sexo,v.nacionalidad,v.ocupacion,v.direccion,v.zona,v.municipio,v.departamento,unir('nombre'),unir('direccion'),unir('parentesco'),lugar.direccionDetallada,f.zonaHecho,lugar.municipio,lugar.departamento,fecha(f.fechaHecho),f.horaHecho,f.movilHecho,f.modusOperandi,f.circunstanciaVictima,c.estadoInvestigacion,f.logrosObtenidos,fecha(f.fechaInformadoMp),f.numeroOficioMp,f.resenaHecho,f.tipoAtencion,...counts,f.clasificacionCaso,entrega,i===0?dias:null,f.observaciones].map(valor);
   });
 }
+// Genera la hoja de Maltrato con sus columnas originales, formatos de celda y filas por
+// víctima, y devuelve el archivo Excel en memoria.
 export async function generarExcelMaltratos(casos:any[]):Promise<Buffer> {
   const wb=new Workbook();wb.creator='SGIC';
   const sheet=wb.addWorksheet('MALTRATO 2026',{views:[{state:'frozen',ySplit:1}]});

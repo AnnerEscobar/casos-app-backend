@@ -8,19 +8,30 @@ import { CrearSolicitudAccesoDto } from './solicitud-acceso.dto';
 import { CasosAlerta } from '../casos-alerta/entities/casos-alerta.entity';
 import { CasosMaltrato } from '../casos-maltrato/entities/casos-maltrato.entity';
 import { CasosConflicto } from '../casos-conflicto/entities/casos-conflicto.entity';
+// Obtiene el valor textual de una referencia o su propiedad _id para comparar identificadores
+// de distintas representaciones.
 const id = (v: any): string => String(v?._id ?? v ?? '');
+// Normaliza el nombre del tipo de caso a la clave utilizada por las búsquedas y solicitudes de
+// acceso.
 export const tipoBusqueda = (v: string): string => v?.toLowerCase().includes('alerta') ? 'alerta' : v?.toLowerCase();
+// Determina si el rol tiene acceso institucional a los expedientes: Administrador, Analista o
+// Jefe.
 export const institucional = (u: UsuarioSesion): boolean => [UserRole.ADMIN, UserRole.ANALISTA, UserRole.JEFE].includes(u?.role);
 @Injectable()
 export class BusquedaAccesoService {
+    // Recibe el modelo de solicitudes de acceso, cuya conexión permite consultar los expedientes y
+    // sus usuarios relacionados.
     constructor(
     @InjectModel(SolicitudAcceso.name)
     private readonly solicitudes: Model<SolicitudAcceso>) {
     }
+    // Exige una identidad con uno de los roles admitidos antes de consultar o gestionar accesos.
     private validarSesion(u: UsuarioSesion) {
         if (!u || ![UserRole.ADMIN, UserRole.ANALISTA, UserRole.JEFE, UserRole.INVESTIGADOR].includes(u.role))
             throw new ForbiddenException();
     }
+    // Reúne las referencias de usuarios de los expedientes y consulta sus nombres y roles para
+    // resolver responsables y presentar resultados.
     private async usuarios(casos: any[]) {
         const ids = new Set<string>();
         for (const c of casos)
@@ -31,12 +42,16 @@ export class BusquedaAccesoService {
         const users = ids.size ? await this.solicitudes.db.model('Usuario').find({ _id: { $in: [...ids] } }).select('_id nombre role').lean().exec() : [];
         return new Map<string, any>(users.map(u => [id(u), u]));
     }
+    // Determina al investigador responsable a partir del origen histórico o del usuario
+    // registrador, sin asignar usuarios que no tengan ese rol.
     private responsable(c: any, users: Map<string, any>) {
         const original = c.origenCaso === 'HISTORICO' ? users.get(id(c.investigadorOriginal?.usuarioId)) : undefined;
         const registrado = users.get(id(c.registradoPor));
         const user = original?.role === UserRole.INVESTIGADOR ? original : registrado?.role === UserRole.INVESTIGADOR ? registrado : undefined;
         return user ? { _id: id(user), nombre: user.nombre } : null;
     }
+    // Calcula el acceso del usuario a cada caso por rol, responsabilidad, seguimiento o permiso.
+    // Oculta datos sensibles cuando no existe autorización.
     async presentar(casos: any[], usuario: UsuarioSesion, exacta = false): Promise<any[]> {
         this.validarSesion(usuario);
         const users = await this.usuarios(casos);
@@ -80,6 +95,8 @@ export class BusquedaAccesoService {
         }
         return resultado;
     }
+    // Valida el tipo de expediente y su identificador, consulta el modelo correspondiente e
+    // informa si el caso no existe.
     private async cargar(tipo: string, casoId: string) {
         const nombres = {
             alerta: CasosAlerta.name, maltrato: CasosMaltrato.name, conflicto: CasosConflicto.name
@@ -91,11 +108,15 @@ export class BusquedaAccesoService {
             throw new NotFoundException('No se encontró el expediente.');
         return { ...caso, tipo: tipo === 'alerta' ? 'Alerta' : tipo === 'maltrato' ? 'Maltrato' : 'Conflicto' };
     }
+    // Exige acceso al expediente y completa los nombres de los usuarios relacionados antes de
+    // devolver sus datos.
     async detalle(tipo: string, casoId: string, usuario: UsuarioSesion) {
         const [caso] = await this.presentar([await this.cargar(tipo, casoId)], usuario, true);
         if (caso.acceso === 'RESTRINGIDO')
             throw new ForbiddenException('Se requiere autorización para consultar este expediente.');
         const users = await this.usuarios([caso]);
+        // Resuelve el nombre de una referencia desde el mapa de usuarios consultado, sin inventarlo si
+        // falta la cuenta.
         const nombre = (v: any) => users.get(id(v))?.nombre || null;
         return {
             ...caso, registradoPorNombre: nombre(caso.registradoPor), revisadoPorNombre: nombre(caso.revisadoPor),
@@ -103,6 +124,8 @@ export class BusquedaAccesoService {
             historialRevisiones: (caso.historialRevisiones || []).map(r => ({ ...r, usuarioNombre: nombre(r.usuario) })),
         };
     }
+    // Valida que proceda pedir acceso a un expediente ajeno y crea o reactiva la solicitud sin
+    // permitir duplicados ni suplantar al solicitante.
     async solicitar(dto: CrearSolicitudAccesoDto, usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         if (usuario.role !== UserRole.INVESTIGADOR)
@@ -127,11 +150,14 @@ export class BusquedaAccesoService {
             throw error;
         }
     }
+    // Devuelve el directorio de investigadores únicamente a usuarios con acceso institucional.
     async investigadores(usuario: UsuarioSesion) {
         if (!institucional(usuario))
             throw new ForbiddenException();
         return this.solicitudes.db.model('Usuario').find({ role: UserRole.INVESTIGADOR }).select('_id nombre').sort({ nombre: 1 }).lean().exec();
     }
+    // Consulta los expedientes accesibles por permisos vigentes o seguimientos asignados y excluye
+    // los que ya son propios del investigador.
     async compartidos(usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         if (usuario.role !== UserRole.INVESTIGADOR) return [];
@@ -147,6 +173,8 @@ export class BusquedaAccesoService {
         const visibles = await this.presentar(grupos.flat(), usuario);
         return visibles.filter(c => c.acceso !== 'PROPIO');
     }
+    // Comprueba que el usuario pueda retirar el permiso y cambia su estado a REVOCADA con
+    // responsable y fecha, sin eliminar la solicitud.
     async revocar(solicitudId: string, usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         if (!Types.ObjectId.isValid(solicitudId)) throw new BadRequestException('Solicitud inválida.');
@@ -162,14 +190,20 @@ export class BusquedaAccesoService {
         if (!updated) throw new ConflictException('El permiso ya no está autorizado.');
         return updated;
     }
+    // Lista las solicitudes visibles para el rol o para sus participantes y resuelve los nombres
+    // de solicitantes y responsables.
     async listar(usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         const filtro = institucional(usuario) ? {} : { $or: [{ solicitante: usuario.userId }, { responsable: usuario.userId }] };
         return this.solicitudes.find(filtro).sort({ fechaSolicitud: -1 }).populate('solicitante responsable resueltoPor', 'nombre').lean().exec();
     }
+    // Construye la bandeja de solicitudes según el usuario y el responsable actual del caso,
+    // indicando qué acciones puede ejecutar sin exponer datos restringidos.
     async bandeja(usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         const modelos = { alerta: CasosAlerta.name, maltrato: CasosMaltrato.name, conflicto: CasosConflicto.name };
+        // Devuelve las formas textual y ObjectId de una referencia válida para consultar registros
+        // almacenados con ambos tipos.
         const variantes = (valor: any) => Types.ObjectId.isValid(id(valor)) ? [id(valor), new Types.ObjectId(id(valor))] : [id(valor)];
         let filtro: any = {};
         if (!institucional(usuario)) {
@@ -211,6 +245,8 @@ export class BusquedaAccesoService {
             }];
         });
     }
+    // Comprueba que el usuario pueda autorizar o rechazar la solicitud y actualiza únicamente una
+    // petición pendiente, registrando responsable y fecha.
     async resolver(solicitudId: string, estado: string, usuario: UsuarioSesion) {
         this.validarSesion(usuario);
         if (!Types.ObjectId.isValid(solicitudId))

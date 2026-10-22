@@ -3,9 +3,15 @@ import { Schema } from 'mongoose';
 import { AUDIT_COLLECTION, cambiosEntre, contextoAuditoria, datosAuditables, MODELOS_AUDITADOS, nuevoEvento } from './auditoria-core';
 
 const ANTES = Symbol('auditoriaAntes');
+// Instala los hooks de Mongoose que registran cambios con la sesión de auditoría y bloquean
+// operaciones masivas o borrados de expedientes no permitidos.
 export function auditoriaPlugin(schema: Schema) {
   // Plugin de conexión: los esquemas de pruebas aisladas no lo instalan implícitamente.
+  // Identifica si el modelo pertenece al conjunto de recursos que requieren captura de cambios
+  // en la bitácora.
   const esModelo = (modelo: any) => MODELOS_AUDITADOS.has(modelo?.modelName);
+  // Obtiene el contexto activo y exige una transacción antes de escribir en un modelo auditado.
+  // Rechaza guardar sin esa protección.
   function sesion(modelo: any) {
     if (!esModelo(modelo)) return;
     const contexto = contextoAuditoria.getStore();
@@ -14,6 +20,8 @@ export function auditoriaPlugin(schema: Schema) {
     }
     return contexto;
   }
+  // Compara los datos persistidos antes y después de la operación e inserta un evento firmado en
+  // la misma transacción cuando existen diferencias.
   async function registrar(modelo: any, anterior: any, nuevo: any) {
     const contexto = sesion(modelo);
     if (!contexto) return;

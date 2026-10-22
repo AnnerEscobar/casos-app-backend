@@ -13,6 +13,8 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('auth')
 export class AuthController {
+  // Devuelve el directorio de investigadores permitido para los roles que incorporan o asignan
+  // expedientes.
   @Get('investigadores')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -20,11 +22,15 @@ export class AuthController {
     return this.authService.investigadores();
   }
 
+  // Recibe los servicios de autenticación y control de intentos utilizados por las rutas de
+  // usuarios y sesiones.
   constructor(
     private readonly authService: AuthService,
     private readonly authRateLimitService: AuthRateLimitService,
   ) { }
 
+  // Controla los intentos, valida las credenciales y establece la cookie de sesión. Devuelve la
+  // fecha de expiración sin exponer el token al cliente.
   @Post('login')
   async login(
     @Body() body: { email: string; password: string },
@@ -52,6 +58,8 @@ export class AuthController {
   }
 
 
+  // Recibe el alta de un usuario desde una sesión administradora, comprueba su límite de
+  // intentos y delega la creación al servicio.
   @Post('register')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -64,6 +72,8 @@ export class AuthController {
 
 
 
+  // Devuelve la identidad que ya fue validada por el guard para confirmar que la sesión continúa
+  // activa.
   @UseGuards(JwtAuthGuard)
   @Get('session')
   session(@Req() req) {
@@ -73,6 +83,8 @@ export class AuthController {
     };
   }
 
+  // Invalida el token persistido del usuario y elimina la cookie de autenticación de la
+  // respuesta.
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
@@ -86,6 +98,8 @@ export class AuthController {
     return { message: 'Sesion cerrada' };
   }
 
+  // Solicita el cambio de contraseña para el usuario autenticado usando los datos validados del
+  // formulario.
   @UseGuards(JwtAuthGuard)
   @Patch('change-password')
   changePassword(@Req() req, @Body() dto: ChangePasswordDto) {
@@ -93,12 +107,16 @@ export class AuthController {
     return this.authService.changePassword(userId, dto);
   }
 
+  // Combina la dirección de conexión y el correo normalizado para identificar los intentos de
+  // autenticación o registro.
   private getRateLimitIdentifier(req: Request, email?: string): string {
     const normalizedEmail = email?.trim().toLowerCase() || 'unknown-email';
     const ip = req.ip || req.socket.remoteAddress || 'unknown-ip';
     return `${ip}:${normalizedEmail}`;
   }
 
+  // Determina si la cookie debe enviarse como segura según el entorno y el uso de HTTPS en el
+  // origen del frontend.
   private useSecureCookie(req: Request): boolean {
     const requestOrigin = req.headers.origin;
     return (
@@ -110,6 +128,7 @@ export class AuthController {
 
   //metodo para servir lista de usuarios, solo accesible para administradores
 
+  // Entrega el listado de usuarios mediante la ruta restringida a administradores.
   @Get('users')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -119,6 +138,8 @@ export class AuthController {
 
   //metodo para actualizar el estado de un usuario, solo accesible para administradores
 
+  // Permite al administrador activar o desactivar un usuario y evita que desactive su propia
+  // cuenta.
   @Patch('users/:id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -140,6 +161,8 @@ export class AuthController {
 
   //acutalizar nombre y rol del usuario, solo accesible para administradores
 
+  // Actualiza los datos permitidos de un usuario e impide que el administrador conectado se
+  // quite su propio rol.
   @Patch('users/:id')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)

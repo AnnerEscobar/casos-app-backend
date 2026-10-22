@@ -41,10 +41,13 @@ import { Response } from 'express';
 @Controller('alertas')
 export class CasosAlertaController {
 
+  // Recibe el servicio de Alerta que valida y ejecuta las operaciones de los expedientes.
   constructor(
     private readonly casosAlertaService: CasosAlertaService
   ) {}
 
+  // Permite al analista abrir y asignar un expediente de Alerta con los datos iniciales, usando
+  // la identidad de la sesión.
   @Post('registro-inicial')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -52,16 +55,22 @@ export class CasosAlertaController {
     return this.casosAlertaService.registrarInicial(dto,req.user);
   }
 
+  // Lista los registros de Alerta visibles para el analista o los asignados al investigador
+  // conectado.
   @Get('gestion')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   gestion(@Req() req: any) { return this.casosAlertaService.gestion(req.user); }
 
+  // Solicita el detalle del expediente de Alerta y delega la comprobación de acceso según el
+  // usuario autenticado.
   @Get('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosAlertaService.detalleGestion(id,req.user); }
 
+  // Envía los avances del expediente de Alerta al servicio para que los guarde únicamente el
+  // investigador asignado.
   @Patch('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -69,6 +78,8 @@ export class CasosAlertaController {
     return this.casosAlertaService.completar(id,dto,req.user);
   }
 
+  // Recibe el PDF obligatorio del expediente de Alerta y solicita su entrega a revisión por el
+  // investigador autenticado.
   @Post('gestion/:id/entregar')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -78,6 +89,8 @@ export class CasosAlertaController {
     return this.casosAlertaService.entregar(id,req.user,file);
   }
 
+  // Genera la base Excel de Alerta para el analista y envía el archivo con sus cabeceras de
+  // descarga.
   @Get('exportar-excel')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -94,6 +107,8 @@ export class CasosAlertaController {
   // Apertura normal por analista sin documentos; los históricos conservan su ruta.
   // ─────────────────────────────────────────────
 
+  // Recibe los datos históricos de Alerta y el PDF opcional para incorporarlos con la identidad
+  // del usuario autorizado.
   @Post('historico')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -108,6 +123,8 @@ export class CasosAlertaController {
     return this.casosAlertaService.incorporarHistorico(dto, req.user, file);
   }
 
+  // Abre el registro inicial de Alerta por el analista y rechaza archivos, porque el
+  // investigador entrega el expediente posteriormente.
   @Post('crear-alerta')
   @UseGuards(RolesGuard)
   @Roles(
@@ -141,6 +158,8 @@ export class CasosAlertaController {
   // Solo Analista
   // ─────────────────────────────────────────────
 
+  // Devuelve los expedientes de Alerta que el analista puede revisar mediante la ruta protegida
+  // para ese rol.
   @Get('pendientes-autorizacion')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -155,6 +174,8 @@ export class CasosAlertaController {
   // Solo Investigador
   // ─────────────────────────────────────────────
 
+  // Consulta los registros de Alerta correspondientes al investigador autenticado, usando su ID
+  // de sesión.
   @Get('mis-registros')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -173,6 +194,7 @@ export class CasosAlertaController {
   // Solo Analista
   // ─────────────────────────────────────────────
 
+  // Solicita aprobar el expediente de Alerta y registra como revisor al analista autenticado.
   @Patch(':id/aprobar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -193,6 +215,8 @@ export class CasosAlertaController {
   // Solo Analista
   // ─────────────────────────────────────────────
 
+  // Solicita rechazar el expediente de Alerta con el motivo recibido y la identidad del analista
+  // que decide.
   @Patch(':id/rechazar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -216,6 +240,8 @@ export class CasosAlertaController {
   // PDF obligatorio
   // ─────────────────────────────────────────────
 
+  // Recibe el PDF corregido y solicita reenviar el expediente de Alerta con la identidad del
+  // investigador conectado.
   @Patch(':id/reenviar-registro')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -249,6 +275,7 @@ export class CasosAlertaController {
   // LISTADO GENERAL
   // ─────────────────────────────────────────────
 
+  // Entrega el listado de expedientes de Alerta obtenido por el servicio.
   @Get()
   async findAll(): Promise<CasosAlerta[]> {
 
@@ -260,6 +287,7 @@ export class CasosAlertaController {
   // BUSCAR POR NÚMERO MP
   // ─────────────────────────────────────────────
 
+  // Exige el número MP de consulta y devuelve los expedientes de Alerta que coinciden.
   @Get('por-expedienteMP')
   async buscarPorNumeroMp(
     @Query('numeroMp') numeroMp: string
@@ -281,6 +309,7 @@ export class CasosAlertaController {
   // BUSCAR POR DEIC
   // ─────────────────────────────────────────────
 
+  // Consulta el expediente de Alerta identificado por el número DEIC de la petición.
   @Get('by-deic/:numeroDeic')
   async buscarPorNumeroDeic(
     @Param('numeroDeic') numeroDeic: string
@@ -296,6 +325,8 @@ export class CasosAlertaController {
   // SEGUIMIENTO
   // ─────────────────────────────────────────────
 
+  // Recibe los datos y archivos del seguimiento de Alerta y delega su validación y registro con
+  // la identidad autenticada.
   @Patch('seguimiento/:numeroDeic')
   @UseInterceptors(
     FilesInterceptor('files')

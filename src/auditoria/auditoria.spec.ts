@@ -226,3 +226,29 @@ describe('Protección al iniciar el servidor', () => {
     await expect(new AuditoriaService(c as any).onModuleInit()).rejects.toThrow('TTL');
   });
 });
+
+describe('Revocar acceso conserva su auditoría', () => {
+  it('mantiene la solicitud y firma el cambio AUTORIZADA → REVOCADA con responsable y fecha', async () => {
+    process.env.AUDIT_HMAC_KEY = clave;
+    const c = createConnection(); c.plugin(auditoriaPlugin);
+    const s = SolicitudAccesoSchema.clone(); s.set('bufferCommands', false);
+    const M = c.model('SolicitudAcceso', s);
+    let dato: any = { _id: new Types.ObjectId(), tipo: 'alerta', casoId: new Types.ObjectId(), numeroDeic: 'DEIC-PRUEBA', solicitante: new Types.ObjectId(), estado: 'AUTORIZADA' };
+    let evento: any;
+    const fecha = new Date(); const quien = new Types.ObjectId();
+    jest.spyOn(M.collection, 'findOne').mockImplementation(async () => ({ ...dato }));
+    jest.spyOn(M.collection, 'findOneAndUpdate').mockImplementation(async (_f: any, u: any) => { dato = { ...dato, ...u.$set }; return { ...dato }; });
+    const borrar = jest.spyOn(M.collection, 'deleteOne');
+    jest.spyOn(c.collection(AUDIT_COLLECTION), 'insertOne').mockImplementation(async (e: any) => { evento = e; return { acknowledged: true } as any; });
+    try {
+      await contextoAuditoria.run({ ...contexto(), session: { inTransaction: () => true, hasEnded: false } as any }, async () => {
+        await M.findOneAndUpdate({ _id: dato._id, estado: 'AUTORIZADA' }, { $set: { estado: 'REVOCADA', revocadoPor: quien, fechaRevocacion: fecha } }, { new: true, runValidators: true }).exec();
+      });
+      expect(dato.estado).toBe('REVOCADA'); expect(borrar).not.toHaveBeenCalled();
+      expect(evento.cambios).toContainEqual({ campo: 'estado', anterior: 'AUTORIZADA', nuevo: 'REVOCADA' });
+      expect(evento.cambios).toContainEqual({ campo: 'revocadoPor', anterior: null, nuevo: String(quien) });
+      expect(evento.cambios).toContainEqual({ campo: 'fechaRevocacion', anterior: null, nuevo: fecha.toISOString() });
+      expect(evento.usuario).toEqual(contexto().usuario); expect(verificarFirma(evento, clave)).toBe(true);
+    } finally { jest.restoreAllMocks(); await c.close(); }
+  });
+});

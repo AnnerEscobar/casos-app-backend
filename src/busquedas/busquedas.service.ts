@@ -13,6 +13,8 @@ import { PipelineStage } from 'mongoose';
 @Injectable()
 export class BusquedasService {
 
+  // Recibe los modelos de Alerta, Maltrato y Conflicto utilizados para unificar consultas y
+  // estadísticas.
   constructor(
     @InjectModel(CasosAlerta.name)
     private readonly casosAlertaModel: Model<CasosAlerta>,
@@ -24,6 +26,8 @@ export class BusquedasService {
 
 
   // Método para buscar por número de expediente MP en los tres tipos de casos
+  // Consulta el número MP en las tres colecciones y combina los resultados identificando su tipo
+  // de caso.
   async buscarPorExpedienteMP(numeroMp: string): Promise<any[]> {
     try {
       // Buscar en las tres colecciones en paralelo
@@ -46,6 +50,8 @@ export class BusquedasService {
     }
   }
 
+  // Busca el DEIC en los tres tipos de expediente y unifica las coincidencias con su tipo
+  // correspondiente.
   async buscarPorNumeroDeic(numeroDeic: string): Promise<any[]> {
     try {
       // Buscar en las tres colecciones en paralelo
@@ -68,6 +74,7 @@ export class BusquedasService {
     }
   }
 
+  // Consulta las alertas por su número Alba-Keneth y marca el tipo en los resultados.
   async buscarPorAlertaAlbaKeneth(numeroAlerta: string): Promise<any[]> {
     try {
       // Buscar solo en la colección de casos de alerta
@@ -85,6 +92,8 @@ export class BusquedasService {
     }
   }
 
+  // Busca coincidencias de nombres en desaparecidos, víctimas e infractores y reúne los
+  // resultados de las tres colecciones.
   async buscarPorNombre(nombre: string): Promise<any[]> {
     try {
       // Buscar en casos de alerta
@@ -124,6 +133,8 @@ export class BusquedasService {
 
   }
 
+  // Busca el CUI o DPI en las personas de Maltrato y Conflicto y devuelve las coincidencias con
+  // su tipo de expediente.
   async buscarPorCUI(cui: string): Promise<any[]> {
     try {
       const term = cui.trim();
@@ -152,6 +163,8 @@ export class BusquedasService {
   }
 
 
+// Valida el rango de fechas y consulta los tipos de caso seleccionados aplicando estado,
+// fechas y filtros específicos de Alerta.
 async buscarCasosFiltrados(filtros: any): Promise<any[]> {
   const { tipoCaso, estado, fechaInicio, fechaFin, origenAlerta, casaHogar } = filtros;
 
@@ -192,6 +205,8 @@ async buscarCasosFiltrados(filtros: any): Promise<any[]> {
 
 
 
+// Agrupa los registros de cada colección por mes y año y combina sus totales para el gráfico
+// mensual.
 async obtenerEstadisticasMensuales(): Promise<any[]> {
   const pipeline: PipelineStage[] = [
     {
@@ -219,6 +234,8 @@ async obtenerEstadisticasMensuales(): Promise<any[]> {
 
   const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
+  // Adapta los resultados agregados de cada tipo de caso al formato utilizado para consolidar
+  // las estadísticas mensuales.
   const normalizar = (resultados: any[], tipo: string) => {
     return resultados.map(r => ({
       mes: meses[r._id.mes - 1],
@@ -248,10 +265,12 @@ async obtenerEstadisticasMensuales(): Promise<any[]> {
 
 
 
+  // Devuelve un mensaje provisional de creación de búsqueda; todavía no guarda información.
   create(createBusquedaDto: CreateBusquedaDto) {
     return 'This action adds a new busqueda';
   }
 
+  // Devuelve un mensaje provisional de listado; todavía no consulta una colección de búsquedas.
   findAll() {
     return `This action returns all busquedas`;
   }
@@ -260,6 +279,8 @@ async obtenerEstadisticasMensuales(): Promise<any[]> {
 
 
 
+  // Devuelve un mensaje provisional para el identificador recibido; todavía no elimina
+  // información.
   remove(id: number) {
     return `This action removes a #${id} busqueda`;
   }

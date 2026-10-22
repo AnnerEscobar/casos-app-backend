@@ -903,6 +903,8 @@ RubricaTemplate = {
    FUNCIONES PARA OBTENER LAS PLANTILLAS
 ========================================================= */
 
+// Devuelve el plan específico de Alerta o adapta el plan general al tipo de caso recibido para
+// Maltrato y Conflicto.
 export function getPlanTemplate(
   tipoCaso: TipoCasoDocumentacion,
 ): PlanTemplate {
@@ -923,6 +925,8 @@ export function getPlanTemplate(
 }
 
 
+// Selecciona la rúbrica del tipo de caso y exige una modalidad válida para distinguir Oficio y
+// Requerimiento en Maltrato.
 export function getRubricaTemplate(
   tipoCaso: TipoCasoDocumentacion,
   modalidadMaltrato?: ModalidadMaltrato,

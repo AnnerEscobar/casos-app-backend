@@ -11,6 +11,8 @@ import { Informe } from './entities/informe.entity';
 @Injectable()
 export class InformeWordService {
 
+  // Valida el formato del informe y compone sus secciones, tablas e imágenes en un documento
+  // Word descargable.
   async generarWord(informe: Informe): Promise<Buffer> {
     this.validarFormatoDisponible(informe);
 
@@ -48,11 +50,14 @@ export class InformeWordService {
     return await Packer.toBuffer(doc);
   }
 
+  // Convierte valores disponibles a texto y representa los datos ausentes con una cadena vacía.
   private str(val: any): string {
     if (val === undefined || val === null || val === '') return '';
     return String(val);
   }
 
+  // Presenta una fecha válida en el formato usado por el informe y conserva una representación
+  // legible cuando no puede interpretarla.
   private formatearFecha(fecha: any): string {
     if (!fecha) return '';
     const d = new Date(fecha);
@@ -61,6 +66,8 @@ export class InformeWordService {
     return `${d.getDate()} de ${meses[d.getMonth()]} del ${d.getFullYear()}`;
   }
 
+  // Convierte una fecha válida a una expresión con día de la semana, día, mes y año para la
+  // narración del informe.
   private formatearFechaConDia(fecha: any): string {
     if (!fecha) return '';
     const d = new Date(fecha);
@@ -71,6 +78,7 @@ export class InformeWordService {
     return `${dias[d.getDay()]} ${diaMes} de ${meses[d.getMonth()]} del ${d.getFullYear()}`;
   }
 
+  // Construye un párrafo de título con la tipografía, tamaño y negrita del formato Word.
   private parrafoTitulo(texto: string): Paragraph {
   return new Paragraph({
     children: [
@@ -84,6 +92,8 @@ export class InformeWordService {
   });
 }
 
+  // Crea el encabezado de una sección con espaciado y subrayado opcional para mantener el
+  // formato del informe.
   private tituloSeccion(texto: string, underline = false): Paragraph {
     return new Paragraph({
       children: [new TextRun({ text: texto, bold: true, underline: underline ? {} : undefined, size: 24, font: 'Arial' })],
@@ -91,10 +101,14 @@ export class InformeWordService {
     });
   }
 
+  // Compone el encabezado institucional con sus logotipos disponibles y la estructura de tabla
+  // del documento.
   private encabezadoInstitucional(tipo: string): Header {
     const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
     const borders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
 
+    // Carga una imagen existente y la adapta a las dimensiones del encabezado; omite el recurso si
+    // no está disponible.
     const loadImg = (filePath: string, width: number, height: number) => {
       if (!fs.existsSync(filePath)) return null;
       const data = fs.readFileSync(filePath);
@@ -109,6 +123,7 @@ export class InformeWordService {
     const imgPnc         = loadImg(path.join(informesAssets, 'logo-pnc.png'), 65, 65);
     const imgTexto       = loadImg(path.join(globalAssets, 'texto-institucional.png'), 300, 75);
 
+    // Crea la celda del encabezado que contiene el logotipo o su espacio cuando no existe imagen.
     const logoCell = (img: ImageRun | null, align: string) => new TableCell({
       children: [new Paragraph({
         alignment: align as any,
@@ -142,6 +157,8 @@ export class InformeWordService {
     return new Header({ children: [tabla] });
   }
 
+  // Construye la tabla de DEIC, MP y número de alerta cuando corresponde, junto con los datos
+  // generales del informe.
   private tablaIdentificadores(informe: Informe): (Paragraph | Table)[] {
     const fecha = this.formatearFecha(informe.datosGenerales?.fechaInforme) || '___________________';
 
@@ -184,6 +201,8 @@ export class InformeWordService {
     ];
   }
 
+  // Compone el destinatario del informe y selecciona la fiscalía correspondiente al tipo de
+  // caso.
   private dirigidoA(informe: Informe): Paragraph[] {
     const fiscalia = informe.tipoInforme === 'conflicto'
       ? 'Fiscalía de Adolescentes en Conflicto con la Ley Penal'
@@ -200,6 +219,7 @@ export class InformeWordService {
     ];
   }
 
+  // Rechaza la generación Word cuando el tipo de informe no coincide con el prefijo del DEIC.
   private validarFormatoDisponible(informe: Informe): void {
     const tipoInforme = informe.tipoInforme?.toLowerCase();
     const numeroDeic = informe.numeroDeic?.trim().toUpperCase();
@@ -215,6 +235,8 @@ export class InformeWordService {
     }
   }
 
+  // Redacta la introducción con requerimiento, diligencias y datos disponibles de la persona,
+  // adaptando el lenguaje al tipo de informe.
   private introduccion(informe: Informe): Paragraph[] {
     const dg = informe.datosGenerales || {};
     const v  = informe.perfilVictima  || {};
@@ -232,6 +254,8 @@ export class InformeWordService {
         ? 'se desarrollen diligencias de investigacion de los hechos cometidos por '
         : 'se desarrollen diligencias de investigacion para la localizacion de ';
 
+    // Crea un segmento de texto con las opciones de presentación usadas al construir la
+    // introducción.
     const t = (text: string, bold = false) =>
       new TextRun({ text, bold, size: 24, font: 'Arial' });
 
@@ -268,6 +292,8 @@ export class InformeWordService {
     ];
   }
 
+  // Añade la sección de hipótesis preliminar cuando el informe contiene ese dato; la omite si
+  // está vacío.
   private hipotesis(informe: Informe): Paragraph[] {
     if (!informe.datosGenerales?.hipotesis) return [];
     return [
@@ -277,10 +303,14 @@ export class InformeWordService {
     ];
   }
 
+  // Compone las tablas de las personas del perfil de víctima usando los campos y rótulos
+  // correspondientes al tipo de informe.
   private tablaPerfilVictima(informe: Informe): (Paragraph | Table)[] {
     const perfil = informe.perfilVictima || {};
     const items = this.normalizarPerfilItems(perfil);
     const tipo = informe.tipoInforme;
+    // Selecciona los pares de etiqueta y valor que deben imprimirse para una persona del perfil de
+    // víctima.
     const camposParaVictima = (v: any): [string, string][] => {
       const camposBase: [string, string][] = [
         ['Nombre:', this.str(v.nombre)],
@@ -343,6 +373,8 @@ export class InformeWordService {
     ];
   }
 
+  // Compone el perfil secundario con el título y los campos de denunciante, sindicado o
+  // adolescente según el tipo de caso.
   private tablaPerfilSecundario(informe: Informe): (Paragraph | Table)[] {
     const perfil = informe.perfilSecundario || {};
     const items = this.normalizarPerfilItems(perfil);
@@ -354,6 +386,8 @@ export class InformeWordService {
       : tipo === 'maltrato' ? 'Del sindicado'
         : 'Del adolescente en conflicto con la ley penal';
 
+    // Prepara los campos de una persona del perfil secundario con las etiquetas correspondientes a
+    // su participación.
     const camposParaSecundario = (s: any): [string, string][] => {
       const camposBase: [string, string][] = [
         ['Nombre:', this.str(s.nombre)],
@@ -421,23 +455,31 @@ export class InformeWordService {
     ]).flat();
   }
 
+  // Adapta perfiles individuales o listas de personas al formato de arreglo y descarta entradas
+  // sin información.
   private normalizarPerfilItems(perfil: any): any[] {
     if (Array.isArray(perfil?.items)) return perfil.items.filter((item) => this.perfilTieneDatos(item));
     return this.perfilTieneDatos(perfil) ? [perfil] : [{}];
   }
 
+  // Comprueba si el perfil contiene algún dato de texto distinto del contenedor de personas.
   private perfilTieneDatos(perfil: any): boolean {
     return Object.keys(perfil || {})
       .filter((key) => key !== 'items')
       .some((key) => this.str(perfil[key]).trim());
   }
 
+  // Construye la tabla de campos personales y el espacio destinado a fotografía con las
+  // proporciones del formato Word.
   private tablaPerfilBasica(titulo: string, campos: [string, string][], perfil: any): Table {
     const FOTO_ROWS = 7;
+    // Crea una celda de etiqueta con texto en negrita para identificar un campo del perfil.
     const labelCell = (text: string) => new TableCell({
       children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 24, font: 'Arial' })] })],
       width: { size: 40, type: WidthType.PERCENTAGE },
     });
+    // Crea una celda de valor con el ancho o combinación de columnas necesaria para el campo del
+    // perfil.
     const valueCell = (text: string, wide = false) => new TableCell({
       children: [new Paragraph({ children: [new TextRun({ text, size: 24, font: 'Arial' })] })],
       width: { size: wide ? 60 : 45, type: WidthType.PERCENTAGE },
@@ -482,6 +524,8 @@ export class InformeWordService {
       ],
     });
   }
+  // Compone las secciones de entrevistas del formato anterior según los participantes del tipo
+  // de caso.
   private entrevistas(informe: Informe): Paragraph[] {
     const e = informe.entrevistas || {};
     const items: [string, string][] = informe.tipoInforme === 'conflicto'
@@ -506,6 +550,8 @@ export class InformeWordService {
     ];
   }
 
+  // Genera las entrevistas numeradas con su encabezado, contenido y datos de la persona a partir
+  // de la lista normalizada.
   private entrevistasDinamicas(informe: Informe): Paragraph[] {
     const items = this.normalizarEntrevistas(informe.entrevistas || {}, informe.tipoInforme);
 
@@ -528,6 +574,8 @@ export class InformeWordService {
     ];
   }
 
+  // Unifica entrevistas de la lista actual y del formato anterior, descartando entradas vacías y
+  // respetando el tipo de informe.
   private normalizarEntrevistas(entrevistas: any, tipoInforme: string): any[] {
     if (Array.isArray(entrevistas?.items)) {
       return entrevistas.items.filter((item) => item?.titulo || item?.contenido);
@@ -548,6 +596,8 @@ export class InformeWordService {
     return legacyItems.filter((item) => item.contenido);
   }
 
+  // Redacta el encabezado de una entrevista presencial o telefónica con fecha, hora y datos
+  // disponibles de la persona.
   private encabezadoEntrevista(item: any): string {
     const fecha = this.formatearFecha(item.fecha) || 'fecha no consignada';
     const horaTexto = this.segmentoHora(item.hora);
@@ -568,6 +618,8 @@ export class InformeWordService {
     return `En fecha ${fecha}${horaTexto}, realice una llamada telefonica${telefonoTexto}, ${atendidaPor}, quien en relacion con los hechos que se investigan manifesto lo siguiente:`;
   }
 
+  // Combina nombre y datos personales disponibles para describir a la persona entrevistada sin
+  // añadir campos ausentes.
   private detallePersonaEntrevistada(item: any): string {
     const partes: string[] = [this.str(item.persona) || 'la persona entrevistada'];
     const edad = this.str(item.edad);
@@ -593,16 +645,21 @@ export class InformeWordService {
     return detalle;
   }
 
+  // Añade la hora a una frase de entrevista cuando fue proporcionada; devuelve texto vacío si
+  // falta.
   private segmentoHora(hora?: string): string {
     const horaLimpia = this.str(hora);
     return horaLimpia ? `, siendo las ${horaLimpia} horas` : '';
   }
 
+  // Genera el segmento de identificación por DPI únicamente cuando existe ese dato.
   private segmentoDpi(dpi?: string): string {
     const dpiLimpio = this.str(dpi);
     return dpiLimpio ? `, quien se identifico con su documento personal de identificacion DPI numero ${dpiLimpio}` : '';
   }
 
+  // Añade la calidad o relación declarada por la persona y evita duplicar la palabra
+  // introductoria de la frase.
   private segmentoCalidadPersona(calidad?: string): string {
     const calidadLimpia = this.str(calidad);
     if (!calidadLimpia) return '';
@@ -612,6 +669,8 @@ export class InformeWordService {
       : `, quien indico ser ${calidadLimpia}`;
   }
 
+  // Compone la descripción del lugar investigado, sus referencias, coordenadas y datos de
+  // cámaras según la información del informe.
   private perfilacionLugar(informe: Informe): Paragraph[] {
     const l = informe.perfilacionLugar || {};
     const fecha = this.formatearFechaConDia(l.fecha || informe.datosGenerales?.fechaDiligencias);
@@ -644,10 +703,14 @@ export class InformeWordService {
       ? this.str(l.indicadoresAmbientales)
       : `En el ${lugarCamaraTexto} no se ubicaron indicadores ambientales de maltrato.`;
     const accesosTexto = this.str(l.accesasSalidas);
+    // Construye un subtítulo dentro de la descripción del lugar con el formato de texto
+    // correspondiente.
     const subtitulo = (texto: string) => new Paragraph({
       children: [new TextRun({ text: texto, bold: true, size: 24, font: 'Arial' })],
       spacing: { before: 160 },
     });
+    // Crea un párrafo de la descripción del lugar con las opciones de estilo usadas en esa
+    // sección.
     const parrafo = (texto: string) => new Paragraph({
       children: [new TextRun({ text: texto, size: 24, font: 'Arial' })],
       alignment: AlignmentType.JUSTIFIED,
@@ -680,6 +743,8 @@ export class InformeWordService {
     ];
   }
 
+  // Redacta la constancia de que no se localizaron cámaras usando fecha, hora y ubicación
+  // disponibles.
   private textoDefaultCamaras(fecha: string, hora: string, ubicacion: string, lugarTexto: string): string {
     const fechaTexto = fecha ? `En fecha ${fecha}` : 'En fecha __________';
     const horaTexto = hora ? `, siendo las ${hora} horas` : '';
@@ -687,6 +752,8 @@ export class InformeWordService {
     return `${fechaTexto}${horaTexto}${ubicacionTexto}, no se lograron ubicar camaras de videovigilancia que enfoquen hacia el ${lugarTexto}.`;
   }
 
+  // Genera las secciones de diligencias adicionales previstas para Alerta y omite esta
+  // estructura para los otros tipos de informe.
   private diligencias(informe: Informe): Paragraph[] {
     const d = informe.diligencias || {};
     const tipo = informe.tipoInforme;
@@ -771,6 +838,8 @@ export class InformeWordService {
     ];
   }
 
+  // Compone las conclusiones y referencias de anexos con la numeración y los textos que
+  // corresponden al tipo de informe.
   private conclusiones(informe: Informe): Paragraph[] {
     const c = informe.conclusiones || {};
     const titulo = informe.tipoInforme === 'alerta'
@@ -790,6 +859,7 @@ export class InformeWordService {
     ];
   }
 
+  // Añade la fórmula de cierre y los espacios de separación anteriores a las firmas.
   private cierre(informe: Informe): Paragraph[] {
     return [
       new Paragraph({ children: [new TextRun({ text: 'Sin otro particular,', size: 24, font: 'Arial' })] }),
@@ -798,6 +868,8 @@ export class InformeWordService {
     ];
   }
 
+  // Construye el bloque de firmas del investigador y sus superiores con bordes y textos
+  // institucionales.
   private tablaFirmas(): (Paragraph | Table)[] {
     const firmaBorders = {
       top: { style: BorderStyle.DOTTED, size: 1, color: '999999' },
@@ -805,11 +877,13 @@ export class InformeWordService {
       left: { style: BorderStyle.DOTTED, size: 1, color: '999999' },
       right: { style: BorderStyle.DOTTED, size: 1, color: '999999' },
     };
+    // Crea un párrafo centrado para los nombres y cargos del bloque de firmas.
     const textoCentrado = (texto: string) =>
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: texto, size: 24, font: 'Arial' })],
       });
+    // Agrupa los párrafos de una firma en una celda con los bordes y márgenes del formato.
     const celda = (children: Paragraph[]) => new TableCell({
       children,
       borders: firmaBorders,
@@ -858,6 +932,8 @@ export class InformeWordService {
     ];
   }
 
+  // Compone el pie institucional con dirección y recurso gráfico cuando la imagen está
+  // disponible.
   private pieDePagina(): Footer {
     const globalAssets = path.join(__dirname, '..', 'assets');
     const imgPath = path.join(globalAssets, 'pie-pagina.png');

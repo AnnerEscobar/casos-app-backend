@@ -61,6 +61,18 @@ describe('Preparar documentos del caso asignado', () => {
     caso.fecha_Nac = null;
     expect((await service.paraCaso('Alerta', String(caso._id), investigadorId)).caratula.edad).toBe('');
   });
+  it.each(['Alerta', 'Maltrato', 'Conflicto'])('%s: acepta el ObjectId real de JWT y conserva el rechazo a investigadores ajenos', async tipo => {
+    caso.investigadorAsignado._id = new Types.ObjectId(investigadorId);
+    const sesionId = new Types.ObjectId(investigadorId) as any;
+    expect((await service.paraCaso(tipo, String(caso._id), sesionId)).numeroDeic).toBe(caso.numeroDeic);
+    await expect(service.paraCaso(tipo, String(caso._id), new Types.ObjectId() as any)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('reabre documentación propia cuando JWT entrega un ObjectId y el borrador tiene referencia Mongoose', async () => {
+    await crear();
+    const contexto = await service.paraCaso('Alerta', String(caso._id), new Types.ObjectId(investigadorId) as any);
+    expect(contexto.documentacion).toBe(doc);
+    await expect(service.paraCaso('Alerta', String(caso._id), new Types.ObjectId() as any)).rejects.toBeInstanceOf(ForbiddenException);
+  });
   it('reabre el borrador del mismo caso sin duplicarlo ni sobrescribir sus cambios', async () => {
     await crear(); doc.caratula.observaciones = 'Borrador conservado';
     const c = await service.paraCaso('Alerta', String(caso._id), investigadorId);

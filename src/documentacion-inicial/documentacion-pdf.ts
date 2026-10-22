@@ -13,6 +13,8 @@ interface FormatoOriginal {
   file: string; width: number; height: number; fields: CampoFormato[];
 }
 const buffers = new Map<string, Buffer>();
+// Carga el recurso de formato o fuente desde la salida compilada o las fuentes del proyecto y
+// conserva su contenido en memoria.
 function recurso(file: string): Buffer {
   const directorio = join(__dirname, 'assets', 'formatos');
   const ruta = existsSync(join(directorio, file)) ? join(directorio, file)
@@ -21,6 +23,8 @@ function recurso(file: string): Buffer {
   return buffers.get(ruta);
 }
 
+// Resuelve el valor que se imprimirá en un campo, incluidos nombres con edad, ubicación
+// completa y respuestas de los documentos.
 function valorCampo(path: string, doc: any, plan: any, rubrica: any): string {
   const c = doc.caratula || {};
   if (path === 'personaConEdad') {
@@ -29,6 +33,8 @@ function valorCampo(path: string, doc: any, plan: any, rubrica: any): string {
   }
   if (path === 'lugarCompleto') {
     let lugar = c.lugar || '';
+    // Elimina diferencias de acentos y mayúsculas para detectar partes de la ubicación ya
+    // incluidas en el texto.
     const normal = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
     for (const parte of [c.municipio, c.departamento]) {
       if (parte && !normal(lugar).includes(normal(parte))) lugar += `${lugar ? ', ' : ''}${parte}`;
@@ -50,6 +56,8 @@ function valorCampo(path: string, doc: any, plan: any, rubrica: any): string {
   return value == null ? '' : String(value);
 }
 
+// Dibuja los valores sobre las áreas editables del formato con sus fuentes y medidas,
+// rechazando textos que exceden el espacio disponible.
 async function sobreimpresion(formato: FormatoOriginal, doc: any, plan: any, rubrica: any): Promise<Buffer> {
   const printer = new PdfPrinter({ Arial: { normal: recurso('Arial.ttf'), bold: recurso('ArialBold.ttf') } });
   const pdf = printer.createPdfKitDocument({ pageSize: { width: formato.width, height: formato.height }, pageMargins: 0, content: [], defaultStyle: { font: 'Arial' } });
@@ -89,6 +97,8 @@ async function sobreimpresion(formato: FormatoOriginal, doc: any, plan: any, rub
   return result;
 }
 
+// Selecciona los formatos originales del caso y su modalidad, superpone los datos y reúne
+// carátula, plan y rúbrica en un único PDF.
 export async function generarDocumentacionPdf(doc: any, plan: any, rubrica: any): Promise<Buffer> {
   const manifest: Record<string, FormatoOriginal> = JSON.parse(recurso('manifest.json').toString('utf8'));
   const tipo = { Alerta: 'alerta', Maltrato: 'maltrato', Conflicto: 'conflicto' }[doc.tipoCaso];

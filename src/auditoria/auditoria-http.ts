@@ -9,7 +9,11 @@ import { AuditoriaService } from './auditoria.service';
 @Injectable()
 export class AuditoriaMiddleware implements NestMiddleware {
   private readonly logger = new Logger(AuditoriaMiddleware.name);
+  // Recibe las dependencias que permiten registrar eventos y, en el interceptor, gestionar la
+  // conexión y las transacciones de MongoDB.
   constructor(private readonly auditoria: AuditoriaService) {}
+  // Crea el contexto de auditoría de la petición y devuelve su identificador en la respuesta.
+  // Registra también los errores y rechazos que terminan antes del interceptor.
   use(req: any, res: any, next: () => void) {
     // No confiar en identificadores ni cabeceras X-Forwarded-For enviados por el cliente.
     const contexto: ContextoAuditoria = {
@@ -30,11 +34,17 @@ export class AuditoriaMiddleware implements NestMiddleware {
     contextoAuditoria.run(contexto, next);
   }
 }
+// Extrae el identificador, nombre y rol del usuario autenticado para conservar su identidad en
+// los eventos de la solicitud.
 export const actor = (user: any) => ({ id: String(user.userId || user._id), nombre: user.nombre || user.email || '', rol: user.role || '' });
 
 @Injectable()
 export class AuditoriaInterceptor implements NestInterceptor {
+  // Recibe las dependencias que permiten registrar eventos y, en el interceptor, gestionar la
+  // conexión y las transacciones de MongoDB.
   constructor(@InjectConnection() private readonly conexion: Connection, private readonly auditoria: AuditoriaService) {}
+  // Ejecuta la petición dentro del contexto de auditoría y agrupa las escrituras y sus eventos
+  // en una transacción. Confirma al terminar o revierte si ocurre un error.
   intercept(context: ExecutionContext, next: CallHandler) {
     const req = context.switchToHttp().getRequest(), res = context.switchToHttp().getResponse();
     const registro: ContextoAuditoria = req.auditoria;

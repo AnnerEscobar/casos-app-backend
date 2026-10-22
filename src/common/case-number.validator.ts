@@ -21,15 +21,21 @@ const alertaMpHelp = 'Formato MP permitido para alerta: M0030-AAAA-###';
 const maltratoMpPattern = /^(?:(?:MPE01|M0008|MP004|M0030|MP001)-\d{4}-\d+|IC\/PNCORLLAT\d+-\d{4}-\d+)$/;
 const maltratoMpHelp = 'Formato MP permitido para maltrato: MPE01-AAAA-###, M0008-AAAA-###, IC/PNCORLLAT###-AAAA-###, MP004-AAAA-###, M0030-AAAA-### o MP001-AAAA-###';
 
+// Elimina caracteres invisibles y espacios exteriores del DEIC y lo convierte a mayúsculas
+// para validar y consultar un identificador uniforme.
 export const normalizeCaseNumber = (numero: string): string => {
   return numero.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '').trim().toUpperCase();
 };
 
+// Comprueba que el DEIC normalizado coincida con alguno de los formatos actuales o históricos
+// del tipo de caso.
 export const isValidCaseNumber = (tipo: TipoCasoNumero, numero: string): boolean => {
   const normalized = normalizeCaseNumber(numero);
   return caseNumberPatterns[tipo].some((pattern) => pattern.test(normalized));
 };
 
+// Exige un DEIC de texto, lo normaliza y rechaza formatos incompatibles con el tipo de caso
+// antes de devolverlo.
 export const assertValidCaseNumber = (tipo: TipoCasoNumero, numero: string): string => {
   if (!numero || typeof numero !== 'string') {
     throw new BadRequestException('El numero de caso es requerido.');
@@ -44,6 +50,7 @@ export const assertValidCaseNumber = (tipo: TipoCasoNumero, numero: string): str
   return normalized;
 };
 
+// Convierte el tipo de carátula a la clave del validador DEIC y rechaza tipos no reconocidos.
 export const caratulaTipoToCaseNumberTipo = (tipoCaso: string): TipoCasoNumero => {
   const normalized = tipoCaso.trim().toLowerCase();
 
@@ -54,22 +61,31 @@ export const caratulaTipoToCaseNumberTipo = (tipoCaso: string): TipoCasoNumero =
   throw new BadRequestException('Tipo de caso invalido.');
 };
 
+// Normaliza el número MP para comparar y guardar su formato sin diferencias de espacios
+// exteriores o mayúsculas.
 export const normalizeMpNumber = (numeroMp: string): string => {
   return normalizeCaseNumber(numeroMp);
 };
 
+// Comprueba que el número MP normalizado tenga uno de los prefijos y formatos admitidos para
+// Conflicto.
 export const isValidConflictoMpNumber = (numeroMp: string): boolean => {
   return conflictoMpPattern.test(normalizeMpNumber(numeroMp));
 };
 
+// Comprueba que el número MP normalizado corresponda al formato admitido para Alerta.
 export const isValidAlertaMpNumber = (numeroMp: string): boolean => {
   return alertaMpPattern.test(normalizeMpNumber(numeroMp));
 };
 
+// Comprueba que el número MP normalizado coincida con alguno de los formatos admitidos para
+// Maltrato.
 export const isValidMaltratoMpNumber = (numeroMp: string): boolean => {
   return maltratoMpPattern.test(normalizeMpNumber(numeroMp));
 };
 
+// Exige y normaliza el número MP de Alerta, rechazando valores vacíos o con formato
+// incompatible.
 export const assertValidAlertaMpNumber = (numeroMp?: string): string => {
   if (!numeroMp || typeof numeroMp !== 'string') {
     throw new BadRequestException('El numero de expediente MP es requerido.');
@@ -84,6 +100,8 @@ export const assertValidAlertaMpNumber = (numeroMp?: string): string => {
   return normalized;
 };
 
+// Exige y normaliza el número MP de Maltrato, rechazando valores vacíos o con formato
+// incompatible.
 export const assertValidMaltratoMpNumber = (numeroMp?: string): string => {
   if (!numeroMp || typeof numeroMp !== 'string') {
     throw new BadRequestException('El numero de expediente MP es requerido.');
@@ -98,6 +116,8 @@ export const assertValidMaltratoMpNumber = (numeroMp?: string): string => {
   return normalized;
 };
 
+// Exige y normaliza el número MP de Conflicto, rechazando valores vacíos o con formato
+// incompatible.
 export const assertValidConflictoMpNumber = (numeroMp?: string): string => {
   if (!numeroMp || typeof numeroMp !== 'string') {
     throw new BadRequestException('El numero de expediente MP es requerido.');
@@ -112,6 +132,8 @@ export const assertValidConflictoMpNumber = (numeroMp?: string): string => {
   return normalized;
 };
 
+// Selecciona el validador MP que corresponde al tipo de carátula y devuelve el identificador
+// validado.
 export const assertValidCaratulaMpNumber = (tipoCaso: string, numeroMp?: string): string | undefined => {
   const tipo = caratulaTipoToCaseNumberTipo(tipoCaso);
 

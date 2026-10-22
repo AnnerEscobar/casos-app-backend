@@ -20,6 +20,8 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosMaltratoService {
+  // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
+  // Maltrato en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialMaltratoDto, usuario: UsuarioSesion) {
     if (usuario.role !== UserRole.ANALISTA) throw new ForbiddenException('Solo el analista registra y asigna el caso inicial de maltrato.');
     await auditoriaSeguimiento(this.casoModel, usuario, dto.investigadorAsignado);
@@ -38,6 +40,8 @@ export class CasosMaltratoService {
     }
   }
 
+  // Consulta los registros del proceso de Maltrato y restringe los resultados del investigador a
+  // los expedientes asignados a su cuenta.
   async gestion(usuario: UsuarioSesion) {
     if (![UserRole.ANALISTA,UserRole.INVESTIGADOR].includes(usuario.role)) throw new ForbiddenException();
     return this.casoModel.find({ procesoMaltrato: true,
@@ -45,6 +49,8 @@ export class CasosMaltratoService {
     }).populate('investigadorAsignado','nombre').populate('registradoPor','nombre').sort({createdAt:-1}).exec();
   }
 
+  // Valida el identificador y consulta un expediente del proceso de Maltrato, permitiendo su
+  // acceso al analista o al investigador asignado.
   async detalleGestion(id: string, usuario: UsuarioSesion) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Identificador de maltrato inválido.');
     const caso=await this.casoModel.findById(id);
@@ -53,6 +59,8 @@ export class CasosMaltratoService {
     return caso;
   }
 
+  // Guarda los avances de Maltrato solo si el investigador es el asignado y el expediente admite
+  // edición. Conserva los datos anteriores no reemplazados.
   async completar(id: string, dto: CompletarMaltratoDto, usuario: UsuarioSesion) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException('El investigador asignado completa el expediente.');
@@ -60,6 +68,8 @@ export class CasosMaltratoService {
     const {sindicados,...resto}=dto;
     const datos:any={...resto};
     if(sindicados!==undefined)datos.infractores=sindicados;
+    // Convierte subdocumentos de Mongoose a objetos simples antes de combinar datos guardados con
+    // los cambios recibidos.
     const plano=(value:any)=>typeof value?.toObject==='function'?value.toObject():value;
     if('fichaMaltrato' in datos) datos.fichaMaltrato={...plano(caso.fichaMaltrato),...datos.fichaMaltrato};
     if(datos.lugarHechos)datos.lugarHechos={...plano(caso.lugarHechos),...datos.lugarHechos};
@@ -72,6 +82,8 @@ export class CasosMaltratoService {
     }
   }
 
+  // Comprueba asignación, etapa y datos obligatorios de Maltrato antes de subir el PDF y
+  // registrar el envío del expediente al analista.
   async entregar(id: string, usuario: UsuarioSesion, file: Express.Multer.File) {
     const caso=await this.detalleGestion(id,usuario);
     if(usuario.role!==UserRole.INVESTIGADOR) throw new ForbiddenException();
@@ -93,6 +105,8 @@ export class CasosMaltratoService {
     }
   }
 
+  // Consulta los expedientes de Maltrato, resuelve los nombres relacionados y genera la base
+  // Excel con el formato del módulo.
   async exportarExcel() {
     const casos=await this.casoModel.find({}).populate('investigadorAsignado','nombre').populate('investigadorOriginal.usuarioId','nombre').sort({fechaIngreso:1,createdAt:1}).lean().exec();
     return generarExcelMaltratos(casos);
@@ -100,17 +114,23 @@ export class CasosMaltratoService {
 
 
 
+  // Adapta los datos históricos de Maltrato al modelo y utiliza el flujo compartido para validar
+  // e incorporar el expediente.
   async incorporarHistorico(dto: CreateHistoricoMaltratoDto, usuario: UsuarioSesion, file?: Express.Multer.File) {
     const { sindicados, ...datos } = dto;
     return incorporarHistorico(this.casoModel, 'maltrato', dto, { ...datos, infractores: sindicados }, usuario, file ? { file, subir: (archivo, numero) => this.subirDocumentoCaso(archivo, numero) } : undefined);
   }
 
 
+  // Asigna al PDF un nombre asociado al DEIC de Maltrato y lo sube a Drive para conservar su
+  // enlace en el expediente.
   private async subirDocumentoCaso(file: Express.Multer.File, numeroDeic: string): Promise<string> {
     const renamedFile = { ...file, originalname: `${numeroDeic}${extname(file.originalname)}` };
     return this.googleApiService.uploadFile(renamedFile);
   }
 
+  // Recibe el modelo de expedientes de Maltrato y el servicio de Drive utilizado para sus
+  // archivos.
   constructor(
     @InjectModel(CasosMaltrato.name)
     private readonly casoModel: Model<CasosMaltratoDocument>,
@@ -118,6 +138,8 @@ export class CasosMaltratoService {
   ) { }
 
 
+  // Ejecuta la creación anterior del expediente de Maltrato, validando identificadores, datos y
+  // archivo antes de guardarlo.
   async create(
     createCasosMaltratoDto: CreateCasosMaltratoDto,
     file: Express.Multer.File,
@@ -264,6 +286,8 @@ export class CasosMaltratoService {
 
   }
 
+  // Consulta los expedientes de Maltrato aprobados y los registros anteriores que todavía no
+  // tienen estado de revisión.
   async findAll(): Promise<CasosMaltratoDocument[]> {
 
     try {
@@ -291,6 +315,8 @@ export class CasosMaltratoService {
     }
   }
 
+  // Valida que el expediente de Maltrato admita actuaciones y que el responsable sea válido,
+  // sube el archivo y guarda el nuevo seguimiento con control de concurrencia.
   async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
     numeroDeic = normalizeCaseNumber(numeroDeic);
     const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
@@ -337,6 +363,8 @@ export class CasosMaltratoService {
   }
 
 
+  // Valida el DEIC y obtiene el expediente de Maltrato permitido por la consulta, incluyendo sus
+  // referencias e historial.
   async buscarPorNumeroDeic(
     numeroDeic: string
   ): Promise<CasosMaltratoDocument> {
@@ -378,6 +406,8 @@ export class CasosMaltratoService {
 
 
   //buscar casos pendientes de registro, para que el analista pueda aprobar o rechazar
+  // Consulta expedientes de Maltrato pendientes de revisión y excluye los del proceso nuevo que
+  // el investigador todavía no ha entregado.
   async findPendientes(): Promise<CasosMaltratoDocument[]> {
 
     return this.casoModel
@@ -404,6 +434,8 @@ export class CasosMaltratoService {
       .exec();
   }
   //metodo para aprobar un caso pendiente de registro
+  // Exige un expediente de Maltrato pendiente y entregado cuando corresponde, registra al
+  // analista revisor y añade la aprobación a su historial.
   async aprobarRegistro(
     casoId: string,
     analistaId: string
@@ -451,6 +483,8 @@ export class CasosMaltratoService {
 
 
   //metodo para rechazar un caso pendiente de registro
+  // Valida que proceda rechazar el expediente de Maltrato, conserva el motivo y añade la
+  // decisión del analista al historial.
   async rechazarRegistro(
     casoId: string,
     analistaId: string,
@@ -498,6 +532,8 @@ export class CasosMaltratoService {
 
 
   //consutlar mis casos pendientes de registro, para que el investigador pueda ver sus casos pendientes de aprobación o rechazo
+  // Consulta los expedientes de Maltrato pendientes o rechazados del investigador: los asignados
+  // en el proceso nuevo y los registrados por él en el anterior.
   async findMisRegistros(
     investigadorId: string
   ): Promise<CasosMaltratoDocument[]> {
@@ -529,6 +565,8 @@ export class CasosMaltratoService {
 
   //reeenviar caso al analista para que lo apruebe o rechace, solo si fue rechazado previamente y el investigador que lo envia es el mismo que lo registro
 
+  // Comprueba que el investigador pueda corregir el expediente de Maltrato, conserva el nuevo
+  // PDF y registra su reenvío para revisión.
   async reenviarRegistro(
     casoId: string,
     investigadorId: string,
@@ -622,14 +660,20 @@ export class CasosMaltratoService {
 
 
   //no implementados
+  // Devuelve una respuesta provisional para el ID de Maltrato; todavía no consulta un expediente
+  // real.
   findOne(id: number) {
     return `This action returns a #${id} casosMaltrato`;
   }
 
+  // Devuelve una respuesta provisional para el ID de Maltrato; todavía no modifica expedientes
+  // en la base.
   update(id: number, updateCasosMaltratoDto: UpdateCasosMaltratoDto) {
     return `This action updates a #${id} casosMaltrato`;
   }
 
+  // Devuelve una respuesta provisional para el ID de Maltrato; no elimina expedientes
+  // persistidos.
   remove(id: number) {
     return `This action removes a #${id} casosMaltrato`;
   }

@@ -9,5 +9,7 @@ import { AuditoriaInterceptor, AuditoriaMiddleware } from './auditoria-http';
   providers: [AuditoriaService, { provide: APP_INTERCEPTOR, useClass: AuditoriaInterceptor }],
 })
 export class AuditoriaModule implements NestModule {
+  // Aplica el middleware de auditoría a las rutas del backend para crear el contexto de cada
+  // petición.
   configure(consumer: MiddlewareConsumer) { consumer.apply(AuditoriaMiddleware).forRoutes('*'); }
 }

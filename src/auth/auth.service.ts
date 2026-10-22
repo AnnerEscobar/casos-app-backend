@@ -12,16 +12,22 @@ import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class AuthService {
+  // Consulta los usuarios con rol Investigador y devuelve únicamente sus datos de identificación
+  // y estado para los selectores.
   investigadores() {
     return this.usuarioModel.find({ role: UserRole.INVESTIGADOR })
       .select('_id nombre role activo').sort({ nombre: 1 }).lean().exec();
   }
 
+  // Recibe el modelo de usuarios y el servicio JWT necesarios para validar identidades y
+  // administrar sesiones.
   constructor(
     @InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>,
     private jwtService: JwtService,
   ) { }
 
+  // Busca el correo, comprueba que la cuenta esté activa y compara la contraseña con su hash.
+  // Rechaza credenciales inválidas sin iniciar sesión.
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usuarioModel.findOne({ email });
     if (!user) {
@@ -38,6 +44,8 @@ export class AuthService {
     return user;
   }
 
+  // Identifica al usuario en el contexto de auditoría, genera su JWT y lo persiste para mantener
+  // una sola sesión válida por cuenta.
   async login(user: any) {
     const auditoria = contextoAuditoria.getStore();
     if (auditoria) auditoria.usuario = { id: String(user._id), nombre: user.nombre, rol: user.role };
@@ -52,12 +60,15 @@ export class AuthService {
     };
   }
 
+  // Borra el token de sesión persistido para invalidar el acceso del usuario.
   async logout(userId: string) {
     await this.usuarioModel.findByIdAndUpdate(userId, { token: null }, { new: true });
     return { message: 'Sesión cerrada' };
   }
 
 
+  // Valida correo, contraseña y rol, impide correos duplicados y guarda el nuevo usuario con la
+  // contraseña protegida mediante hash.
   async register(userData: CreateAuthDto) {
     const { nombre, email, password, role, } = userData ?? {};
 
@@ -100,6 +111,8 @@ export class AuthService {
   }
 
 
+  // Busca al usuario y verifica la contraseña actual antes de guardar el hash de la nueva
+  // contraseña y confirmar el cambio.
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.usuarioModel.findById(userId);
     if (!user) throw new NotFoundException('Usuario no encontrado');
@@ -116,6 +129,7 @@ export class AuthService {
 
   //listar todos los usuarios
 
+  // Consulta los usuarios para administración sin devolver contraseñas ni tokens de sesión.
   async findAllUsers() {
     return await this.usuarioModel
       .find()
@@ -127,6 +141,8 @@ export class AuthService {
 
   //actualizar el estado de un usuario
 
+  // Busca la cuenta indicada, actualiza su estado activo y guarda el cambio; informa si el
+  // usuario no existe.
   async UpdateUserStatus(userId: string, activo: boolean) {
     const user = await this.usuarioModel.findById(userId);
 
@@ -157,6 +173,8 @@ export class AuthService {
     };
   }
 
+  // Busca al usuario y actualiza su nombre o rol cuando fueron proporcionados, devolviendo los
+  // datos de identificación de la cuenta.
   async updateUser(userId: string, dto: UpdateUserDto) {
 
     const user = await this.usuarioModel.findById(userId);

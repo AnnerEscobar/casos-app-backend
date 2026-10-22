@@ -3,12 +3,16 @@ import { Document } from 'mongoose';
 
 interface EstadoSeguimiento { estado?: string; nuevoEstado?: string }
 type TipoCaso = 'alerta' | 'maltrato' | 'conflicto';
+// Determina si el estado cierra el seguimiento según el tipo de caso: Remitido o Concluido
+// para Alerta y Desestimado para los otros módulos.
 export function esEstadoTerminal(tipo: TipoCaso, estado?: string): boolean {
   return tipo === 'alerta' ? estado === 'Remitido' || estado === 'Concluido' : estado === 'Desestimado';
 }
 
 // Los tres services agregan con push: el orden persistido del arreglo es el
 // orden de registro, incluso con fechas iguales o datos antiguos sin fecha.
+// Examina la última actuación y rechaza nuevos seguimientos cuando su estado ya cerró la
+// investigación.
 export function validarSeguimientoAbierto(tipo: TipoCaso, caso: { seguimientos?: EstadoSeguimiento[] | null }): void {
   const ultimo = caso.seguimientos?.[caso.seguimientos.length - 1];
   if (esEstadoTerminal(tipo, tipo === 'alerta' ? ultimo?.nuevoEstado : ultimo?.estado)) {
@@ -19,6 +23,8 @@ export function validarSeguimientoAbierto(tipo: TipoCaso, caso: { seguimientos?:
   }
 }
 
+// Guarda la actuación solo si la cantidad previa de seguimientos no cambió. Traduce conflictos
+// concurrentes a una respuesta que obliga a consultar nuevamente.
 export async function guardarSeguimiento(caso: Document, cantidadAnterior: number): Promise<void> {
   // La condición se evalúa en la misma escritura: otra petición no puede
   // agregar una actuación usando el historial anterior a un cierre concurrente.
@@ -33,6 +39,8 @@ export async function guardarSeguimiento(caso: Document, cantidadAnterior: numbe
   }
 }
 
+// Resuelve los nombres del investigador asignado y del registrador en las actuaciones,
+// incluido el arreglo de seguimientos de Alerta.
 export async function poblarUsuariosSeguimientos(caso: Document): Promise<void> {
   await caso.populate([
     { path: 'seguimientos.investigadorAsignado', model: 'Usuario', select: 'nombre', strictPopulate: false },

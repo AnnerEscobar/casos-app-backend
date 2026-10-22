@@ -18,8 +18,12 @@ import {
 @Injectable()
 export class RolesGuard implements CanActivate {
 
+  // Recibe el lector de metadatos usado para consultar los roles definidos en rutas y
+  // controladores.
   constructor(private reflector: Reflector) {}
 
+  // Comprueba los roles exigidos por la ruta frente al usuario autenticado. Permite rutas sin
+  // restricción de rol y rechaza identidades o roles no autorizados.
   canActivate(context: ExecutionContext): boolean {
 
     const requiredRoles =

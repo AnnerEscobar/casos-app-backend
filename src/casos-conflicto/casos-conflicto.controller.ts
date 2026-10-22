@@ -42,6 +42,7 @@ import { RechazarRegistroDto } from 'src/common/dto/rechazar-registro.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('conflictos')
 export class CasosConflictoController {
+  // Recibe el servicio de Conflicto que valida y ejecuta las operaciones de los expedientes.
   constructor(private readonly casosConflictoService: CasosConflictoService) {}
 
   // ─────────────────────────────────────────────
@@ -49,6 +50,8 @@ export class CasosConflictoController {
   // Analista / Investigador
   // ─────────────────────────────────────────────
 
+  // Permite al analista abrir y asignar un expediente de Conflicto con los datos iniciales,
+  // usando la identidad de la sesión.
   @Post('registro-inicial')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -56,16 +59,22 @@ export class CasosConflictoController {
     return this.casosConflictoService.registrarInicial(dto,req.user);
   }
 
+  // Lista los registros de Conflicto visibles para el analista o los asignados al investigador
+  // conectado.
   @Get('gestion')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   gestion(@Req() req: any) { return this.casosConflictoService.gestion(req.user); }
 
+  // Solicita el detalle del expediente de Conflicto y delega la comprobación de acceso según el
+  // usuario autenticado.
   @Get('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA,UserRole.INVESTIGADOR)
   detalleGestion(@Param('id') id: string,@Req() req: any) { return this.casosConflictoService.detalleGestion(id,req.user); }
 
+  // Envía los avances del expediente de Conflicto al servicio para que los guarde únicamente el
+  // investigador asignado.
   @Patch('gestion/:id')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -73,6 +82,8 @@ export class CasosConflictoController {
     return this.casosConflictoService.completar(id,dto,req.user);
   }
 
+  // Recibe el PDF obligatorio del expediente de Conflicto y solicita su entrega a revisión por
+  // el investigador autenticado.
   @Post('gestion/:id/entregar')
   @UseGuards(RolesGuard)
   @Roles(UserRole.INVESTIGADOR)
@@ -82,6 +93,8 @@ export class CasosConflictoController {
     return this.casosConflictoService.entregar(id,req.user,file);
   }
 
+  // Genera la base Excel de Conflicto para el analista y envía el archivo con sus cabeceras de
+  // descarga.
   @Get('exportar-excel')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -93,6 +106,8 @@ export class CasosConflictoController {
   }
 
 
+  // Recibe los datos históricos de Conflicto y el PDF opcional para incorporarlos con la
+  // identidad del usuario autorizado.
   @Post('historico')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
@@ -107,6 +122,8 @@ export class CasosConflictoController {
     return this.casosConflictoService.incorporarHistorico(dto, req.user, file);
   }
 
+  // Abre el registro inicial de Conflicto por el analista y rechaza archivos, porque el
+  // expediente se entrega posteriormente.
   @Post('crear-conflicto')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
@@ -116,20 +133,71 @@ export class CasosConflictoController {
     return this.casosConflictoService.registrarInicial(dto,req.user);
   }
 
+  // Entrega el listado de expedientes de Conflicto obtenido por el servicio.
   @Get()
   async findAll(): Promise<CasosConflictoDocument[]> {
     return this.casosConflictoService.findAll();
+  }
+
+  // Consulta los registros de Conflicto correspondientes al investigador autenticado, usando su
+  // ID de sesión.
+  @Get('mis-registros')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  findMisRegistros(@Req() req: any) {
+    return this.casosConflictoService.findMisRegistros(req.user.userId);
+  }
+
+  // Devuelve los expedientes de Conflicto que el analista puede revisar mediante la ruta
+  // protegida para ese rol.
+  @Get('pendientes-autorizacion')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  findPendientes() {
+    return this.casosConflictoService.findPendientes();
+  }
+
+  // Solicita aprobar el expediente de Conflicto y registra como revisor al analista autenticado.
+  @Patch(':id/aprobar-registro')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  aprobarRegistro(@Param('id') id: string, @Req() req: any) {
+    return this.casosConflictoService.aprobarRegistro(id, req.user.userId);
+  }
+
+  // Solicita rechazar el expediente de Conflicto con el motivo recibido y la identidad del
+  // analista que decide.
+  @Patch(':id/rechazar-registro')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  rechazarRegistro(@Param('id') id: string, @Body() dto: RechazarRegistroDto, @Req() req: any) {
+    return this.casosConflictoService.rechazarRegistro(id, req.user.userId, dto.motivo);
+  }
+
+  // Recibe el PDF corregido y solicita reenviar el expediente de Conflicto con la identidad del
+  // investigador conectado.
+  @Patch(':id/reenviar-registro')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  reenviarRegistro(@Param('id') id: string, @Req() req: any,
+    @UploadedFile(new ParseFilePipeBuilder().addFileTypeValidator({ fileType: 'application/pdf' }).build({ fileIsRequired: true })) file: Express.Multer.File) {
+    return this.casosConflictoService.reenviarRegistro(id, req.user.userId, file);
   }
 
   // ─────────────────────────────────────────────
   // MÉTODOS TODAVÍA NO IMPLEMENTADOS
   // ─────────────────────────────────────────────
 
+  // Delega en la consulta provisional por ID de Conflicto; todavía devuelve un mensaje de
+  // ejemplo.
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.casosConflictoService.findOne(+id);
   }
 
+  // Delega en la actualización provisional por ID de Conflicto, que todavía no modifica
+  // documentos.
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -138,6 +206,8 @@ export class CasosConflictoController {
     return this.casosConflictoService.update(+id, updateCasosConflictoDto);
   }
 
+  // Delega en el método provisional de eliminación de Conflicto; ese método no borra expedientes
+  // de la base.
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.casosConflictoService.remove(+id);

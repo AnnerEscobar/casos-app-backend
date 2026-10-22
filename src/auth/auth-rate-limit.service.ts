@@ -17,6 +17,8 @@ export class AuthRateLimitService {
     register: 3,
   };
 
+  // Cuenta los intentos de una acción por identificador dentro de una ventana de tiempo y
+  // rechaza las peticiones que exceden su límite.
   assertAllowed(action: AuthAction, identifier: string): void {
     const now = Date.now();
     const key = `${action}:${identifier}`;
@@ -37,6 +39,8 @@ export class AuthRateLimitService {
     current.count += 1;
   }
 
+  // Elimina el contador de intentos de la acción e identificador indicados para reiniciar su
+  // control de frecuencia.
   reset(action: AuthAction, identifier: string): void {
     this.attempts.delete(`${action}:${identifier}`);
   }
