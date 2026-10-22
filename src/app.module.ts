@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AuditoriaModule } from './auditoria/auditoria.module';
+import { auditoriaPlugin } from './auditoria/auditoria-plugin';
 import { CasosAlertaModule } from './casos-alerta/casos-alerta.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
@@ -18,7 +20,13 @@ import {
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    MongooseModule.forRoot(process.env.MONGO_URI),
+    MongooseModule.forRoot(process.env.MONGO_URI, {
+      connectionFactory: (conexion) => {
+        conexion.plugin(auditoriaPlugin);
+        return conexion;
+      },
+    }),
+    AuditoriaModule,
     CasosAlertaModule,
     GoogleApiModule,
     CasosMaltratoModule,

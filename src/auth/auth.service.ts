@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { contextoAuditoria } from '../auditoria/auditoria-core';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -38,6 +39,8 @@ export class AuthService {
   }
 
   async login(user: any) {
+    const auditoria = contextoAuditoria.getStore();
+    if (auditoria) auditoria.usuario = { id: String(user._id), nombre: user.nombre, rol: user.role };
     const payload = { sub: user._id, email: user.email, role: user.role };
     const token = this.jwtService.sign(payload);
 

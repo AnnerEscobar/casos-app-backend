@@ -4,8 +4,17 @@ services:
   db:
     container_name: casos-db
     image: mongo:7.0.12
+    entrypoint:
+      - bash
+      - -ec
+      - |
+        cp /run/sgic-secrets/mongo-keyfile /tmp/sgic-keyfile
+        chmod 400 /tmp/sgic-keyfile
+        chown mongodb:mongodb /tmp/sgic-keyfile
+        exec /usr/local/bin/docker-entrypoint.sh mongod --replSet sgic-rs --bind_ip_all --auth --keyFile /tmp/sgic-keyfile
     volumes:
       - ./mongo:/data/db
+      - ./config/auditoria-local:/run/sgic-secrets:ro
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     restart: always

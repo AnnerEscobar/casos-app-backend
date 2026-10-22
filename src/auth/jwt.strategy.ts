@@ -45,6 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // Retornar solo los datos que necesitas
   return {
     userId: user._id,
+    nombre: user.nombre,
     email: user.email,
     role: user.role,
     exp: payload.exp,
