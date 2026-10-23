@@ -135,14 +135,25 @@ export class BusquedaAccesoService {
             throw new ConflictException('Ya tienes acceso al expediente.');
         if (caso.solicitud?.estado === 'PENDIENTE')
             throw new ConflictException('Ya existe una solicitud pendiente.');
+        const identidad = { tipo: dto.tipo, casoId: dto.casoId, solicitante: usuario.userId };
+        const datos = {
+            numeroDeic: caso.numeroDeic, motivo: dto.motivo, responsable: caso.investigador?._id ?? null,
+            estado: 'PENDIENTE', fechaSolicitud: new Date()
+        };
         try {
-            return await this.solicitudes.findOneAndUpdate({
-                tipo: dto.tipo, casoId: dto.casoId, solicitante: usuario.userId, estado: { $in: ['RECHAZADA', 'REVOCADA'] }
-            }, { $set: {
-                    numeroDeic: caso.numeroDeic, motivo: dto.motivo, responsable: caso.investigador?._id ?? null, estado: 'PENDIENTE', fechaSolicitud: new Date()
-                }, $unset: { resueltoPor: '', fechaResolucion: '' } }, {
-                upsert: true, new: true, runValidators: true
+            // La creación y la reactivación pasan por los hooks de auditoría en la transacción actual.
+            if (!caso.solicitud) {
+                const creada = await this.solicitudes.create({ ...identidad, ...datos });
+                return creada.toObject();
+            }
+            const reactivada = await this.solicitudes.findOneAndUpdate({
+                ...identidad, estado: { $in: ['RECHAZADA', 'REVOCADA'] }
+            }, { $set: datos, $unset: { resueltoPor: '', fechaResolucion: '', revocadoPor: '', fechaRevocacion: '' } }, {
+                new: true, runValidators: true
             }).lean().exec();
+            if (!reactivada)
+                throw new ConflictException('La solicitud cambió de estado. Actualiza la búsqueda.');
+            return reactivada;
         }
         catch (error) {
             if (error.code === 11000)

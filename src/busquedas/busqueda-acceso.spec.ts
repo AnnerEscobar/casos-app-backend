@@ -25,6 +25,7 @@ function entorno(tipo = 'Maltrato') {
     const usuarioModel = { find: jest.fn(() => cadena(users)) };
     const casoModel = { findById: jest.fn(() => cadena(caso)) };
     const model: any = {
+        create: jest.fn(async (dato: any) => ({ toObject: () => ({ ...dato }) })),
         find: jest.fn(() => cadena([])), findById: jest.fn(() => cadena(null)), findOneAndUpdate: jest.fn(() => cadena({ estado: 'PENDIENTE' })), db: { model: jest.fn(name => name === 'Usuario' ? usuarioModel : casoModel) }
     };
     return {
@@ -157,9 +158,9 @@ describe('Búsquedas: permisos y solicitudes', () => {
         await service.solicitar({
             tipo: 'maltrato', casoId: caseId, motivo: 'Nuevo lineamiento recibido'
         }, sesion());
-        expect(model.findOneAndUpdate).toHaveBeenCalledWith(expect.objectContaining({ solicitante: other, casoId: caseId }), expect.objectContaining({ $set: expect.objectContaining({
-                estado: 'PENDIENTE', responsable: owner, motivo: 'Nuevo lineamiento recibido'
-            }) }), expect.objectContaining({ upsert: true }));
+        expect(model.create).toHaveBeenCalledWith(expect.objectContaining({ solicitante: other, casoId: caseId,
+            estado: 'PENDIENTE', responsable: owner, motivo: 'Nuevo lineamiento recibido' }));
+        expect(model.findOneAndUpdate).not.toHaveBeenCalled();
         expect(caso.registradoPor).toBe(owner);
     });
     it('evita solicitudes duplicadas antes de escribir', async () => {
@@ -174,7 +175,7 @@ describe('Búsquedas: permisos y solicitudes', () => {
     });
     it('convierte carrera de duplicados a 409', async () => {
         const { service, model } = entorno();
-        model.findOneAndUpdate.mockReturnValue({ ...cadena(null), exec: () => Promise.reject({ code: 11000 }) });
+        model.create.mockRejectedValue({ code: 11000 });
         await expect(service.solicitar({
             tipo: 'maltrato', casoId: caseId, motivo: 'Nuevo lineamiento'
         }, sesion())).rejects.toBeInstanceOf(ConflictException);
