@@ -9,6 +9,8 @@ import { Usuario, UsuarioDocument } from './entities/auth.entity';
 import { UserRole } from './enums/user-role.enum';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { INACTIVIDAD_MS, SesionesService } from './sesiones.service';
+import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +26,7 @@ export class AuthService {
   constructor(
     @InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>,
     private jwtService: JwtService,
+    private sesiones: SesionesService,
   ) { }
 
   // Busca el correo, comprueba que la cuenta esté activa y compara la contraseña con su hash.
@@ -49,20 +52,28 @@ export class AuthService {
   async login(user: any) {
     const auditoria = contextoAuditoria.getStore();
     if (auditoria) auditoria.usuario = { id: String(user._id), nombre: user.nombre, rol: user.role };
-    const payload = { sub: user._id, email: user.email, role: user.role };
+    if (user.sesionId) await this.sesiones.cerrar(user,
+      new Date(user.sesionExpira).getTime() <= Date.now() ? 'INACTIVIDAD' : 'NUEVO_INICIO');
+    const inicio = new Date(), sesionId = randomUUID();
+    const expira = new Date(inicio.getTime() + INACTIVIDAD_MS);
+    const payload = { sub: user._id, email: user.email, role: user.role, jti: sesionId };
     const token = this.jwtService.sign(payload);
 
     // Guardar token en el usuario para permitir solo una sesión
-    await this.usuarioModel.findByIdAndUpdate(user._id, { token }, { new: true });
+    await this.usuarioModel.findByIdAndUpdate(user._id, { token, sesionId, sesionInicio: inicio,
+      sesionUltimaActividad: inicio, sesionExpira: expira }, { new: true });
+    if (auditoria) auditoria.sesion = { id: sesionId, inicio };
 
     return {
       access_token: token,
+      expiresAt: expira.getTime(), idleTimeoutMs: INACTIVIDAD_MS,
     };
   }
 
   // Borra el token de sesión persistido para invalidar el acceso del usuario.
-  async logout(userId: string) {
-    await this.usuarioModel.findByIdAndUpdate(userId, { token: null }, { new: true });
+  async logout(userId: string, sesionId: string) {
+    const user = await this.usuarioModel.findOne({ _id: userId, sesionId });
+    await this.sesiones.cerrar(user, 'MANUAL');
     return { message: 'Sesión cerrada' };
   }
 

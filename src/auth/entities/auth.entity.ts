@@ -21,6 +21,11 @@ export class Usuario {
   @Prop()
   token?: string;
 
+  @Prop() sesionId?: string;
+  @Prop() sesionInicio?: Date;
+  @Prop() sesionUltimaActividad?: Date;
+  @Prop() sesionExpira?: Date;
+
   @Prop({
     type: String,
     enum: Object.values(UserRole),

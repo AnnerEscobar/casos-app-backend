@@ -111,10 +111,13 @@ export class AuditoriaInterceptor implements NestInterceptor {
         const resultado = await lastValueFrom(next.handle());
         // Los cambios ya tienen actor, ruta y solicitud: no duplicar con un resumen HTTP.
         // Una descarga conserva INICIADO; no acredita recepción del archivo en el cliente.
-        if (sesionUsuario || (escritura && !registro.eventos) || (!escritura && lectura && lectura !== 'DESCARGAR')) await this.auditoria.registrar(registro, {
+        if (registro.ruta !== '/auth/logout' && registro.ruta !== '/auth/actividad' &&
+            (sesionUsuario || (escritura && !registro.eventos) || (!escritura && lectura && lectura !== 'DESCARGAR'))) await this.auditoria.registrar(registro, {
           accion: sesionUsuario || (escritura ? 'SOLICITUD' : lectura),
           resultado: 'EXITOSO', codigoHttp: res.statusCode, recurso: 'HTTP', cambios: [], eventosDeDatos: registro.eventos,
           ...(!escritura ? expedienteConsultado(registro.ruta, resultado) : {}),
+          ...(registro.sesion ? { sesion: registro.sesion } : {}),
+          ...(sesionUsuario ? { recurso: 'Usuario', recursoId: registro.usuario?.id || '' } : {}),
         }, escritura);
         if (session) await session.commitTransaction();
         return resultado;

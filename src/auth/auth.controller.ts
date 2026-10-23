@@ -10,6 +10,7 @@ import { UserRole } from './enums/user-role.enum';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { INACTIVIDAD_MS, SesionesService } from './sesiones.service';
 
 @Controller('auth')
 export class AuthController {
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly authRateLimitService: AuthRateLimitService,
+    private readonly sesiones: SesionesService,
   ) { }
 
   // Controla los intentos, valida las credenciales y establece la cookie de sesión. Devuelve la
@@ -40,7 +42,7 @@ export class AuthController {
     const rateLimitIdentifier = this.getRateLimitIdentifier(req, body.email);
     this.authRateLimitService.assertAllowed('login', rateLimitIdentifier);
     const user = await this.authService.validateUser(body.email, body.password);
-    const { access_token } = await this.authService.login(user);
+    const { access_token, expiresAt, idleTimeoutMs } = await this.authService.login(user);
     this.authRateLimitService.reset('login', rateLimitIdentifier);
     const useSecureCookie = this.useSecureCookie(req);
 
@@ -48,12 +50,12 @@ export class AuthController {
       httpOnly: true,
       sameSite: useSecureCookie ? 'none' : 'lax',
       secure: useSecureCookie,
-      maxAge: 60 * 60 * 1000,
+      maxAge: INACTIVIDAD_MS + 60000,
     });
 
     return {
       message: 'Sesion iniciada correctamente',
-      expiresAt: Date.now() + 60 * 60 * 1000,
+      expiresAt, idleTimeoutMs,
     };
   }
 
@@ -80,7 +82,22 @@ export class AuthController {
     return {
       authenticated: true,
       user: req.user,
+      expiresAt: req.user.expiresAt, idleTimeoutMs: INACTIVIDAD_MS,
     };
+  }
+
+  // Renueva el vencimiento solo ante interacción del usuario. El guard comprueba
+  // primero la sesión y el servicio actualiza su plazo dentro de la transacción.
+  @UseGuards(JwtAuthGuard)
+  @Post('actividad')
+  async actividad(@Req() req, @Res({ passthrough: true }) res: Response) {
+    const datos = await this.sesiones.actividad(req.user.userId, req.user.sesionId);
+    const token = req.headers.cookie?.split(';').map(c => c.trim()).find(c => c.startsWith('access_token='))?.slice('access_token='.length);
+    if (token) {
+      const secure = this.useSecureCookie(req);
+      res.cookie('access_token', decodeURIComponent(token), { httpOnly: true, sameSite: secure ? 'none' : 'lax', secure, maxAge: INACTIVIDAD_MS + 60000 });
+    }
+    return datos;
   }
 
   // Invalida el token persistido del usuario y elimina la cookie de autenticación de la
@@ -88,7 +105,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
-    await this.authService.logout(req.user.userId);
+    await this.authService.logout(req.user.userId, req.user.sesionId);
     const useSecureCookie = this.useSecureCookie(req);
     res.clearCookie('access_token', {
       httpOnly: true,

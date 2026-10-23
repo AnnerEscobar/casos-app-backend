@@ -13,11 +13,12 @@ export interface ContextoAuditoria {
   agente: string;
   session?: ClientSession;
   eventos: number;
+  sesion?: Record<string, any>;
 }
 export const contextoAuditoria = new AsyncLocalStorage<ContextoAuditoria>();
 
 // No se copia el cuerpo HTTP. Estas propiedades nunca salen a la bitácora.
-const reservado = /password|contrase[nñ]a|token|secret|cookie|authorization|_presentacionTextos|^__v$|^updatedAt$/i;
+const reservado = /password|contrase[nñ]a|token|secret|cookie|authorization|_presentacionTextos|^sesion(Id|Inicio|UltimaActividad|Expira)$|^__v$|^updatedAt$/i;
 // Prepara una copia de los datos para auditoría y excluye credenciales, tokens y metadatos
 // internos antes de comparar los cambios.
 export function datosAuditables(valor: any): any {

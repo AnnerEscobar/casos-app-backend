@@ -245,11 +245,17 @@ describe('Transacciones HTTP y rechazos', () => {
     expect(auditoria.registrar).not.toHaveBeenCalled();
     expect(session.commitTransaction).toHaveBeenCalledTimes(1);
   });
-  it.each(['/auth/login', '/auth/logout'])('conserva el evento de sesión en %s', async ruta => {
+  it.each(['/auth/login'])('conserva el evento de sesión en %s', async ruta => {
     req.method = 'POST'; req.originalUrl = ruta; req.auditoria.eventos = 1;
     await lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') }));
     expect(auditoria.registrar).toHaveBeenCalledTimes(1);
     expect(auditoria.registrar.mock.calls[0][1].accion).toBe(ruta.endsWith('login') ? 'INICIAR_SESION' : 'CERRAR_SESION');
+  });
+  it.each(['/auth/actividad', '/auth/logout'])('no duplica eventos administrados por sesiones: %s', async ruta => {
+    req.method = 'POST'; req.originalUrl = ruta;
+    await lastValueFrom(interceptor.intercept(ctx, { handle: () => of('ok') }));
+    expect(auditoria.registrar).not.toHaveBeenCalled();
+    expect(session.commitTransaction).toHaveBeenCalled();
   });
   it('omite el 401 normal de sesión ausente sin perder el 403 de un expediente', async () => {
     const middleware = new AuditoriaMiddleware(auditoria);

@@ -93,6 +93,31 @@ Esto no permite confirmar un cambio de datos sin auditoría.
 
 ## Consulta y ejemplo
 
+### Sesiones por inactividad
+
+La sesión vence tras 15 minutos sin interacción. `/auth/actividad` renueva ese
+plazo desde el reloj del servidor, únicamente si la sesión sigue vigente. El
+frontend agrupa las interacciones y no renueva por polling, cargas HTTP ni por
+consultar `/auth/session`. Las pestañas comparten el vencimiento y el servidor
+comprueba la sesión persistida en cada petición protegida.
+
+El JWT nuevo tiene identificador aleatorio y firma, sin vencimiento fijo de una
+hora: su vigencia depende del token persistido, usuario activo y `sesionExpira`.
+Los tokens emitidos antes de esta actualización requieren volver a iniciar
+sesión. La cookie se renueva con la actividad. No se aceptan fechas de actividad
+ni duraciones calculadas por el navegador.
+
+El cierre guarda un evento firmado `CERRAR_SESION` con identificador de sesión,
+inicio, última actividad, fin, duración total en segundos y motivo: `MANUAL`,
+`INACTIVIDAD` o `NUEVO_INICIO` (otra sesión de la misma cuenta). La duración incluye
+la espera antes de vencer; no mide trabajo efectivo. Un proceso revisa sesiones
+vencidas cada 30 segundos y después de arrancar, incluso sin navegador abierto.
+El fin por inactividad es el vencimiento calculado, no la hora tardía de detección.
+La invalidación y el evento se confirman juntos; los conflictos concurrentes se
+revisan en el siguiente ciclo. Las renovaciones técnicas no generan eventos.
+No se reconstruyen duraciones de sesiones antiguas ni se alteran sus eventos.
+No se necesitan nuevas colecciones ni privilegios MongoDB.
+
 Pantalla `/casos/auditoria`, visible y autorizada en backend únicamente para
 Administrador y Jefe. Frontend y backend deben actualizarse juntos. Búsqueda
 paginada con DEIC exacto, nombre parcial literal o ID de usuario, recurso,

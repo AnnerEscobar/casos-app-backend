@@ -9,18 +9,18 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Usuario, UsuarioSchema } from './entities/auth.entity';
 import { AuthRateLimitService } from './auth-rate-limit.service';
 import { RolesGuard } from './Guards/roles.guard';
+import { SesionesService } from './sesiones.service';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET ?? 'local_jwt_secret',
-      signOptions: { expiresIn: '1h' },
     }),
      MongooseModule.forFeature([{ name: Usuario.name, schema: UsuarioSchema }])
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, AuthRateLimitService, RolesGuard],
+  providers: [AuthService, JwtStrategy, AuthRateLimitService, RolesGuard, SesionesService],
   exports: [AuthService, RolesGuard],
   
 

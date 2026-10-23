@@ -5,6 +5,7 @@ import { Request } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Usuario, UsuarioDocument } from './entities/auth.entity';
+import { SesionesService } from './sesiones.service';
 
 // Busca una cookie por su nombre y decodifica su valor; devuelve null si la cabecera no la
 // contiene.
@@ -31,7 +32,7 @@ const extractJwtFromRequest = (req: Request): string | null => {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   // Configura la extracción y validación del JWT con Passport y recibe el modelo de usuarios
   // para comprobar la sesión persistida.
-  constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>) {
+  constructor(@InjectModel(Usuario.name) private usuarioModel: Model<UsuarioDocument>, private sesiones: SesionesService) {
     super({
       jwtFromRequest: extractJwtFromRequest,
       ignoreExpiration: false,
@@ -49,6 +50,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   if (!user ||user.activo === false ||!token || user.token !== token) {
     throw new UnauthorizedException();
   }
+  await this.sesiones.validar(user);
 
   // Retornar solo los datos que necesitas
   return {
@@ -57,6 +59,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     email: user.email,
     role: user.role,
     exp: payload.exp,
+    sesionId: user.sesionId,
+    expiresAt: new Date(user.sesionExpira).getTime(),
   };
 }
 
