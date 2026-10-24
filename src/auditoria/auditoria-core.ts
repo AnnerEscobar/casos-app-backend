@@ -3,7 +3,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { ClientSession } from 'mongoose';
 
 export const AUDIT_COLLECTION = 'bitacora_auditoria';
-export const MODELOS_AUDITADOS = new Set(['CasosAlerta', 'CasosMaltrato', 'CasosConflicto', 'DocumentacionInicial', 'Caratula', 'Informe', 'SolicitudAcceso', 'Usuario']);
+export const MODELOS_AUDITADOS = new Set(['CasosAlerta', 'CasosMaltrato', 'CasosConflicto', 'DocumentacionInicial', 'Caratula', 'SolicitudAcceso', 'Usuario']);
 export interface ContextoAuditoria {
   solicitudId: string;
   usuario?: { id: string; nombre: string; rol: string };

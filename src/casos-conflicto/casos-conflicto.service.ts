@@ -1,3 +1,4 @@
+import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
 import { generarExcelConflictos } from './conflicto-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
@@ -253,11 +254,11 @@ async create(
 
  // Consulta los expedientes de Conflicto aprobados y los registros anteriores que todavía no
  // tienen estado de revisión.
- async findAll(): Promise<CasosConflictoDocument[]> {
+ async findAll(usuario: UsuarioSesion): Promise<CasosConflictoDocument[]> {
 
   try {
 
-    return await this.casoModel.find({
+    const conflictos = await this.casoModel.find({
 
       $or: [
         {
@@ -271,6 +272,7 @@ async create(
       ]
 
     }).exec();
+    return filtrarAccesoExpedientes(this.casoModel, conflictos, 'conflicto', usuario);
 
   } catch (error) {
 
@@ -285,12 +287,14 @@ async create(
   // sube el archivo y guarda el nuevo seguimiento con control de concurrencia.
   async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
     numeroDeic = normalizeCaseNumber(numeroDeic);
-    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
+
     const caso = await this.casoModel.findOne({ numeroDeic });
   
     if (!caso) {
       throw new NotFoundException('Caso no encontrado');
     }
+    exigirSeguimientoExpediente(caso, usuario);
+    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
     validarSeguimientoAbierto('conflicto', caso);
     const cantidadAnterior = caso.seguimientos?.length ?? 0;
     validarResponsableHistorico(caso, auditoria);
@@ -328,7 +332,7 @@ async create(
 // Valida el DEIC y obtiene el expediente de Conflicto permitido por la consulta, incluyendo
 // sus referencias e historial.
 async buscarPorNumeroDeic(
-  numeroDeic: string
+  numeroDeic: string, usuario: UsuarioSesion
 ): Promise<CasosConflictoDocument> {
     numeroDeic = normalizeCaseNumber(numeroDeic);
 
@@ -354,6 +358,8 @@ async buscarPorNumeroDeic(
       `No se encontró ningún caso aprobado con número DEIC: ${numeroDeic}`
     );
   }
+    await exigirConsultaExpediente(this.casoModel, caso, 'conflicto', usuario);
+
 
   if (caso.origenCaso === 'HISTORICO') {
     await caso.populate([
@@ -528,23 +534,18 @@ async rechazarRegistro(
   return caso;
 }
 
-// Consulta los expedientes de Conflicto pendientes o rechazados del investigador: los
-// asignados en el proceso nuevo y los registrados por él en el anterior.
+// Conserva todos los registros de Conflicto pendientes o rechazados del investigador y añade
+// sus diez aprobados más recientes, sin ampliar la propiedad del proceso nuevo ni del anterior.
 async findMisRegistros(
   investigadorId: string
 ): Promise<CasosConflictoDocument[]> {
 
-  return this.casoModel
+  const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casoModel
     .find({
 
       $or:[{procesoConflicto:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoConflicto:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
 
-      estadoRegistro: {
-        $in: [
-          EstadoRegistro.PENDIENTE,
-          EstadoRegistro.RECHAZADO
-        ]
-      }
+      estadoRegistro,
 
     })
     .populate(
@@ -554,11 +555,18 @@ async findMisRegistros(
     .populate(
       'historialRevisiones.usuario',
       'nombre email role'
-    )
-    .sort({
-      createdAt: -1
-    })
-    .exec();
+    );
+
+  const [pendientes, aprobados] = await Promise.all([
+    consultar({ $in: [EstadoRegistro.PENDIENTE, EstadoRegistro.RECHAZADO] })
+      .sort({ createdAt: -1 })
+      .exec(),
+    consultar(EstadoRegistro.APROBADO)
+      .sort({ fechaRevision: -1, createdAt: -1, _id: -1 })
+      .limit(10)
+      .exec(),
+  ]);
+  return [...pendientes, ...aprobados];
 }
 
 

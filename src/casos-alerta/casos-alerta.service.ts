@@ -1,3 +1,4 @@
+import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
 import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
 import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
@@ -288,7 +289,7 @@ export class CasosAlertaService {
   //cruds creados por el nestjsd
   // Consulta los expedientes de Alerta aprobados y los registros anteriores que todavía no
   // tienen estado de revisión.
-  async findAll(): Promise<CasosAlerta[]> {
+  async findAll(usuario: UsuarioSesion): Promise<CasosAlerta[]> {
     try {
       const alertas = await this.casosAlertaModel.find({
         $or: [
@@ -302,7 +303,7 @@ export class CasosAlertaService {
           }
         ]
       }).exec();
-      return alertas;
+      return filtrarAccesoExpedientes(this.casosAlertaModel, alertas, 'alerta', usuario);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Error al obtener los casos de alerta, ${errorMessage}`);
@@ -313,7 +314,7 @@ export class CasosAlertaService {
   // Normaliza el MP y consulta las alertas aprobadas o anteriores sin estado de revisión;
   // informa si no encuentra coincidencias.
   async buscarPorNumeroMp(
-    numeroMp: string
+    numeroMp: string, usuario: UsuarioSesion
   ): Promise<CasosAlerta[]> {
     numeroMp = normalizeMpNumber(numeroMp);
 
@@ -343,7 +344,7 @@ export class CasosAlertaService {
     }
 
 
-    return alertas;
+    return filtrarAccesoExpedientes(this.casosAlertaModel, alertas, 'alerta', usuario);
   }
 
   //metodo para agregar un seguimiento a un caso
@@ -357,12 +358,14 @@ export class CasosAlertaService {
     usuario: UsuarioSesion,
   ) {
     numeroDeic = normalizeCaseNumber(numeroDeic);
-    const auditoria = await auditoriaSeguimiento(this.casosAlertaModel, usuario, dto.investigadorAsignado);
+
     const caso = await this.casosAlertaModel.findOne({ numeroDeic });
 
     if (!caso) {
       throw new NotFoundException('Caso de alerta no encontrado');
     }
+    exigirSeguimientoExpediente(caso, usuario);
+    const auditoria = await auditoriaSeguimiento(this.casosAlertaModel, usuario, dto.investigadorAsignado);
     validarSeguimientoAbierto('alerta', caso);
     const cantidadAnterior = caso.seguimientos?.length ?? 0;
     validarResponsableHistorico(caso, auditoria);
@@ -409,7 +412,7 @@ export class CasosAlertaService {
   // Valida el DEIC y obtiene el expediente de Alerta permitido por la consulta, incluyendo sus
   // referencias e historial.
   async buscarPorNumeroDeic(
-    numeroDeic: string
+    numeroDeic: string, usuario: UsuarioSesion
   ): Promise<CasosAlerta> {
     numeroDeic = normalizeCaseNumber(numeroDeic);
 
@@ -435,6 +438,8 @@ export class CasosAlertaService {
         'No se encontró un caso de alerta aprobado con ese número DEIC.'
       );
     }
+    await exigirConsultaExpediente(this.casosAlertaModel, caso, 'alerta', usuario);
+
 
     if (caso.origenCaso === 'HISTORICO') {
       await caso.populate([
@@ -586,8 +591,8 @@ export class CasosAlertaService {
   }
 
 
-  // Consulta los expedientes de Alerta pendientes o rechazados del investigador: los asignados
-  // en el proceso nuevo y los registrados por él en el anterior.
+  // Conserva todos los registros de Alerta pendientes o rechazados del investigador y añade
+  // sus diez aprobados más recientes, sin ampliar la propiedad del proceso nuevo ni del anterior.
   async findMisRegistros(
 
     investigadorId: string
@@ -599,19 +604,14 @@ export class CasosAlertaService {
       );
     }
 
-    return this.casosAlertaModel
+    const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casosAlertaModel
       .find({
         $or: [
           { procesoAlerta: true, investigadorAsignado: new Types.ObjectId(investigadorId) },
           { procesoAlerta: { $ne: true }, registradoPor: new Types.ObjectId(investigadorId) },
         ],
 
-        estadoRegistro: {
-          $in: [
-            EstadoRegistro.PENDIENTE,
-            EstadoRegistro.RECHAZADO
-          ]
-        }
+        estadoRegistro,
       })
       .populate(
         'revisadoPor',
@@ -620,11 +620,18 @@ export class CasosAlertaService {
       .populate(
         'historialRevisiones.usuario',
         'nombre email role'
-      )
-      .sort({
-        createdAt: -1
-      })
-      .exec();
+      );
+
+    const [pendientes, aprobados] = await Promise.all([
+      consultar({ $in: [EstadoRegistro.PENDIENTE, EstadoRegistro.RECHAZADO] })
+        .sort({ createdAt: -1 })
+        .exec(),
+      consultar(EstadoRegistro.APROBADO)
+        .sort({ fechaRevision: -1, createdAt: -1, _id: -1 })
+        .limit(10)
+        .exec(),
+    ]);
+    return [...pendientes, ...aprobados];
   }
 
 

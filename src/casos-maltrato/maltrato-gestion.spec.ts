@@ -105,7 +105,7 @@ describe('Maltrato: analista, asignación, expediente y revisión',()=>{
     expect(()=>controller.crearInicial(inicial as any,{user:analista},pdf)).toThrow(BadRequestException);
   });
   it('filtra Mis registros por responsable y oculta borradores de revisión',async()=>{
-    const query={populate:jest.fn().mockReturnThis(),sort:jest.fn().mockReturnThis(),exec:jest.fn().mockResolvedValue([])};
+    const query={populate:jest.fn().mockReturnThis(),sort:jest.fn().mockReturnThis(),limit:jest.fn().mockReturnThis(),exec:jest.fn().mockResolvedValue([])};
     modelo.find=jest.fn().mockReturnValue(query);
     await service.findPendientes();expect(modelo.find.mock.calls[0][0].expedienteEnPreparacion).toEqual({$ne:true});
     await service.findMisRegistros(investigador.userId);

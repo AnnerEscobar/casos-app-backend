@@ -17,7 +17,6 @@ import { CasosConflictoSchema } from '../casos-conflicto/entities/casos-conflict
 import { DocumentacionInicialSchema } from '../documentacion-inicial/entities/documentacion-inicial.entity';
 import { UsuarioSchema } from '../auth/entities/auth.entity';
 import { CaratulaSchema } from '../caratulas/entities/caratula.entity';
-import { InformeSchema } from '../informes/entities/informe.entity';
 import { SolicitudAccesoSchema } from '../busquedas/solicitud-acceso.schema';
 
 const clave = 'prueba-auditoria-no-usar-en-produccion-123456';
@@ -132,10 +131,10 @@ describe('Middleware real de Mongoose con driver simulado', () => {
   });
 });
 
-describe('Instalación en los ocho esquemas reales y coexistencia con mayúsculas', () => {
+describe('Instalación en los siete esquemas reales y coexistencia con mayúsculas', () => {
   it.each([
     ['CasosAlerta', CasosAlertaSchema], ['CasosMaltrato', CasosMaltratoSchema], ['CasosConflicto', CasosConflictoSchema],
-    ['DocumentacionInicial', DocumentacionInicialSchema], ['Usuario', UsuarioSchema], ['Caratula', CaratulaSchema], ['Informe', InformeSchema], ['SolicitudAcceso', SolicitudAccesoSchema],
+    ['DocumentacionInicial', DocumentacionInicialSchema], ['Usuario', UsuarioSchema], ['Caratula', CaratulaSchema], ['SolicitudAcceso', SolicitudAccesoSchema],
   ] as const)('audita creación real de %s con la sesión y sin credenciales', async (nombre, original) => {
     process.env.AUDIT_HMAC_KEY = clave;
     const c = createConnection(); c.plugin(auditoriaPlugin);

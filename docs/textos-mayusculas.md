@@ -13,7 +13,7 @@ eliminan acentos.
 ## Cobertura
 
 El plugin compartido `src/common/textos-mayusculas.ts` se instala en los modelos
-de Alerta, Maltrato, Conflicto, usuarios, carátulas, informes, documentación
+de Alerta, Maltrato, Conflicto, usuarios, carátulas, documentación
 inicial y solicitudes de acceso. Cubre sus objetos anidados, personas, fichas,
 históricos, revisiones y seguimientos. Las escrituras actuales de la aplicación
 usan `save`/`create` o actualizaciones `$set`/`$setOnInsert`; estas últimas
@@ -55,6 +55,6 @@ node node_modules/jest/bin/jest.js --config test/jest-textos.json --runInBand --
 Las pruebas ejecutan los hooks y la serialización real de Mongoose y capturan
 la operación enviada al driver. Cubren relectura, `lean`, proyecciones,
 ediciones, errores al guardar, cambios de personas, arrays y actualizaciones
-atómicas. Incluyen los ocho esquemas reales y regresiones de gestión,
+atómicas. Incluyen los siete esquemas reales y regresiones de gestión,
 históricos, seguimiento, usuarios y búsquedas. Los métodos del driver se
 sustituyen en las pruebas; no se modifican expedientes de una base real.

@@ -72,6 +72,8 @@ export async function incorporarHistorico(
 // Valida que el responsable seleccionado sea un investigador activo y construye las
 // referencias del usuario registrador y del investigador asignado.
 export async function auditoriaSeguimiento(model: Model<any>, usuario: UsuarioSesion, asignado?: string) {
+  if (usuario.role === UserRole.INVESTIGADOR && asignado && String(asignado) !== String(usuario.userId))
+    throw new ForbiddenException('Solo el analista puede asignar otro investigador al seguimiento.');
   const investigadorId = asignado ?? (usuario.role === UserRole.INVESTIGADOR ? String(usuario.userId) : undefined);
   if (investigadorId) {
     if (!Types.ObjectId.isValid(investigadorId) || !await model.db.model('Usuario').exists({

@@ -277,9 +277,9 @@ export class CasosAlertaController {
 
   // Entrega el listado de expedientes de Alerta obtenido por el servicio.
   @Get()
-  async findAll(): Promise<CasosAlerta[]> {
+  async findAll(@Req() req: any): Promise<CasosAlerta[]> {
 
-    return this.casosAlertaService.findAll();
+    return this.casosAlertaService.findAll(req.user);
   }
 
 
@@ -290,8 +290,7 @@ export class CasosAlertaController {
   // Exige el número MP de consulta y devuelve los expedientes de Alerta que coinciden.
   @Get('por-expedienteMP')
   async buscarPorNumeroMp(
-    @Query('numeroMp') numeroMp: string
-  ): Promise<CasosAlerta[]> {
+    @Query('numeroMp') numeroMp: string, @Req() req: any): Promise<CasosAlerta[]> {
 
     if (!numeroMp) {
       throw new NotFoundException(
@@ -300,8 +299,7 @@ export class CasosAlertaController {
     }
 
     return this.casosAlertaService.buscarPorNumeroMp(
-      numeroMp
-    );
+      numeroMp, req.user);
   }
 
 
@@ -312,12 +310,10 @@ export class CasosAlertaController {
   // Consulta el expediente de Alerta identificado por el número DEIC de la petición.
   @Get('by-deic/:numeroDeic')
   async buscarPorNumeroDeic(
-    @Param('numeroDeic') numeroDeic: string
-  ) {
+    @Param('numeroDeic') numeroDeic: string, @Req() req: any) {
 
     return this.casosAlertaService.buscarPorNumeroDeic(
-      numeroDeic
-    );
+      numeroDeic, req.user);
   }
 
 
@@ -328,13 +324,15 @@ export class CasosAlertaController {
   // Recibe los datos y archivos del seguimiento de Alerta y delega su validación y registro con
   // la identidad autenticada.
   @Patch('seguimiento/:numeroDeic')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
   @UseInterceptors(
     FilesInterceptor('files')
   )
   async actualizarCasoAlerta(
     @Param('numeroDeic') numeroDeic: string,
     @Body() dto: UpdateCasosAlertaDto,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles(new ParseFilePipeBuilder().addFileTypeValidator({ fileType: 'application/pdf' }).build({ fileIsRequired: false })) files: Express.Multer.File[],
     @Req() req: any
   ) {
 

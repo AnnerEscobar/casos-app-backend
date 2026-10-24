@@ -4,7 +4,6 @@ import { CasosAlertaSchema } from '../casos-alerta/entities/casos-alerta.entity'
 import { CasosMaltratoSchema } from '../casos-maltrato/entities/casos-maltrato.entity';
 import { CasosConflictoSchema } from '../casos-conflicto/entities/casos-conflicto.entity';
 import { UsuarioSchema } from '../auth/entities/auth.entity';
-import { InformeSchema } from '../informes/entities/informe.entity';
 import { CaratulaSchema } from '../caratulas/entities/caratula.entity';
 import { DocumentacionInicialSchema } from '../documentacion-inicial/entities/documentacion-inicial.entity';
 import { SolicitudAccesoSchema } from '../busquedas/solicitud-acceso.schema';
@@ -187,7 +186,7 @@ describe('Mayúsculas persistidas y presentación original (middleware Mongoose 
 
   it.each([
     ['Alerta', CasosAlertaSchema], ['Maltrato', CasosMaltratoSchema], ['Conflicto', CasosConflictoSchema],
-    ['Usuario', UsuarioSchema], ['Informe', InformeSchema], ['Caratula', CaratulaSchema],
+    ['Usuario', UsuarioSchema], ['Caratula', CaratulaSchema],
     ['DocumentacionInicial', DocumentacionInicialSchema], ['SolicitudAcceso', SolicitudAccesoSchema],
   ])('instala la política en el esquema real %s', (_nombre, realSchema) => {
     expect((realSchema as Schema).path('_presentacionTextos')).toBeDefined();
@@ -198,7 +197,6 @@ describe('Mayúsculas persistidas y presentación original (middleware Mongoose 
     ['Maltrato', CasosMaltratoSchema, { victimas: [{ nombre: 'María López' }], estadoInvestigacion: 'Informado', procesoMaltrato: true }, 'victimas.0.nombre'],
     ['Conflicto', CasosConflictoSchema, { infractores: [{ nombre: 'María López' }], estadoInvestigacion: 'Informado', procesoConflicto: true }, 'infractores.0.nombre'],
     ['Usuario', UsuarioSchema, { nombre: 'María López', email: 'Maria@Ejemplo.com', password: '$2b$AbCd', role: 'Investigador' }, 'nombre'],
-    ['Informe', InformeSchema, { tipoInforme: 'alerta', datosGenerales: { nombreFiscal: 'María López' } }, 'datosGenerales.nombreFiscal'],
     ['Caratula', CaratulaSchema, { tipoCaso: 'Alerta', nombre: 'María López' }, 'nombre'],
     ['DocumentacionInicial', DocumentacionInicialSchema, { tipoCaso: 'Alerta', investigadorNombre: 'María López' }, 'investigadorNombre'],
     ['SolicitudAcceso', SolicitudAccesoSchema, { tipo: 'alerta', motivo: 'María López' }, 'motivo'],

@@ -4,6 +4,6 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["informes/assets/**", "assets/**", "documentacion-inicial/assets/**"]
+    "assets": ["assets/**", "documentacion-inicial/assets/**"]
   }
 }

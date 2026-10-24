@@ -1,3 +1,4 @@
+import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
 import { generarExcelMaltratos } from './maltrato-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
@@ -288,7 +289,7 @@ export class CasosMaltratoService {
 
   // Consulta los expedientes de Maltrato aprobados y los registros anteriores que todavía no
   // tienen estado de revisión.
-  async findAll(): Promise<CasosMaltratoDocument[]> {
+  async findAll(usuario: UsuarioSesion): Promise<CasosMaltratoDocument[]> {
 
     try {
 
@@ -305,7 +306,7 @@ export class CasosMaltratoService {
         ]
       }).exec();
 
-      return maltratos;
+      return filtrarAccesoExpedientes(this.casoModel, maltratos, 'maltrato', usuario);
 
     } catch (error) {
 
@@ -319,13 +320,15 @@ export class CasosMaltratoService {
   // sube el archivo y guarda el nuevo seguimiento con control de concurrencia.
   async agregarSeguimiento(numeroDeic: string, estado: string, file: Express.Multer.File, usuario: UsuarioSesion, investigadorAsignado?: string) {
     numeroDeic = normalizeCaseNumber(numeroDeic);
-    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
+
 
     const caso = await this.casoModel.findOne({ numeroDeic });
 
     if (!caso) {
       throw new NotFoundException('Caso no encontrado');
     }
+    exigirSeguimientoExpediente(caso, usuario);
+    const auditoria = await auditoriaSeguimiento(this.casoModel, usuario, investigadorAsignado);
     validarSeguimientoAbierto('maltrato', caso);
     if (!file) {
       throw new BadRequestException('El documento de respaldo es obligatorio para registrar el seguimiento');
@@ -366,7 +369,7 @@ export class CasosMaltratoService {
   // Valida el DEIC y obtiene el expediente de Maltrato permitido por la consulta, incluyendo sus
   // referencias e historial.
   async buscarPorNumeroDeic(
-    numeroDeic: string
+    numeroDeic: string, usuario: UsuarioSesion
   ): Promise<CasosMaltratoDocument> {
     numeroDeic = normalizeCaseNumber(numeroDeic);
 
@@ -393,6 +396,8 @@ export class CasosMaltratoService {
         `No se encontró ningún caso aprobado con número DEIC: ${numeroDeic}`
       );
     }
+    await exigirConsultaExpediente(this.casoModel, caso, 'maltrato', usuario);
+
 
     if (caso.origenCaso === 'HISTORICO') {
       await caso.populate([
@@ -531,23 +536,17 @@ export class CasosMaltratoService {
   }
 
 
-  //consutlar mis casos pendientes de registro, para que el investigador pueda ver sus casos pendientes de aprobación o rechazo
-  // Consulta los expedientes de Maltrato pendientes o rechazados del investigador: los asignados
-  // en el proceso nuevo y los registrados por él en el anterior.
+  // Conserva todos los registros de Maltrato pendientes o rechazados del investigador y añade
+  // sus diez aprobados más recientes, sin ampliar la propiedad del proceso nuevo ni del anterior.
   async findMisRegistros(
     investigadorId: string
   ): Promise<CasosMaltratoDocument[]> {
 
-    return this.casoModel
+    const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casoModel
       .find({
         $or:[{procesoMaltrato:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoMaltrato:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
 
-        estadoRegistro: {
-          $in: [
-            EstadoRegistro.PENDIENTE,
-            EstadoRegistro.RECHAZADO
-          ]
-        }
+        estadoRegistro,
       })
       .populate(
         'revisadoPor',
@@ -555,11 +554,18 @@ export class CasosMaltratoService {
       ).populate(
         'historialRevisiones.usuario',
         'nombre email role'
-      )
-      .sort({
-        createdAt: -1
-      })
-      .exec();
+      );
+
+    const [pendientes, aprobados] = await Promise.all([
+      consultar({ $in: [EstadoRegistro.PENDIENTE, EstadoRegistro.RECHAZADO] })
+        .sort({ createdAt: -1 })
+        .exec(),
+      consultar(EstadoRegistro.APROBADO)
+        .sort({ fechaRevision: -1, createdAt: -1, _id: -1 })
+        .limit(10)
+        .exec(),
+    ]);
+    return [...pendientes, ...aprobados];
   }
 
 

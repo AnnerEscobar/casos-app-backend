@@ -13,7 +13,7 @@ Los tres módulos incorporan históricos en sus modelos y colecciones actuales. 
 - Se preservan JWT, roles y autorización de registros: Analista → `Aprobado`; Investigador → `Pendiente`. No se aprueban históricos automáticamente por el mero hecho de ser históricos.
 - Los seguimientos siguen embebidos: su caso padre establece la relación. No se duplica `casoId` ni se agrega `investigadorActual` al caso.
 - Se reutiliza `normalizeCaseNumber`/`normalizeMpNumber`, ampliando la limpieza de caracteres Unicode invisibles como U+200E. Las búsquedas por DEIC de cada módulo y sus seguimientos usan la misma normalización. No se reescriben identificadores ya almacenados; si existen datos antiguos contaminados, conviene auditarlos aparte antes de corregirlos.
-- No se modifican informes, carátulas ni sus requisitos. Tienen modelos y DTOs independientes. Incorporar un histórico no fabrica un informe o carátula ni evita que sus rutas exijan los datos documentales que necesitan. Las estadísticas por `createdAt` continúan contando incorporaciones al sistema, no el año de los hechos.
+- No se modifican las carátulas ni sus requisitos. Incorporar un histórico no fabrica una carátula ni evita que sus rutas exijan los datos documentales que necesitan. Las estadísticas por `createdAt` continúan contando incorporaciones al sistema, no el año de los hechos.
 - Pendiente para la fase Angular: `actualizarCasosPorInvestigador` en `estadistics.component.ts` usa actualmente `registradoPor` para su gráfica. Al habilitar históricos en la interfaz, debe distinguir el investigador original del registrador usando los nuevos metadatos; no interpretar esa gráfica actual como atribución del trabajo original de los históricos. No se cambió esa pantalla en esta entrega de backend.
 
 ## Campos
@@ -175,7 +175,7 @@ En una base de pruebas, después de preparar índices:
 4. Enviar metadatos inválidos, un MP incorrecto, DEIC de otro módulo o auditoría libre: debe devolver 400. Sin sesión: 401; con rol no autorizado en incorporación: 403.
 5. Crear como Investigador: comprobar `Pendiente`. Agregar seguimiento usando el DEIC de la respuesta y luego aprobar por la ruta existente.
 6. Agregar dos seguimientos con investigadores distintos y verificar que Juan siga como investigador original y María figure solamente como registradora de cada seguimiento.
-7. Repetir una creación normal completa con PDF y una incompleta: la primera debe funcionar y la segunda rechazarse. Abrir casos anteriores y verificar sus búsquedas e informes habituales.
+7. Repetir una creación normal completa con PDF y una incompleta: la primera debe funcionar y la segunda rechazarse. Abrir casos anteriores y verificar sus búsquedas y documentos habituales.
 
 ## Archivos de esta implementación
 

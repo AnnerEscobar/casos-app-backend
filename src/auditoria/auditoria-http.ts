@@ -18,7 +18,6 @@ function accionLectura(ruta: string): string | undefined {
       /^\/(alertas|maltratos|conflictos)\/(gestion\/[^/]+|buscar\/[^/]+|by-deic\/[^/]+|[a-f\d]{24})\/?$/i.test(ruta) ||
       /^\/alertas\/por-expedienteMP\/?$/.test(ruta) ||
       /^\/documentacion-inicial\/(para-caso\/[^/]+\/[^/]+|[a-f\d]{24}(?:\/(plan|rubrica))?)\/?$/i.test(ruta) ||
-      /^\/informes\/(?!pendientes(?:\/|$))[^/]+\/?$/.test(ruta) ||
       /^\/auditoria\/[^/]+\/?$/.test(ruta)) return 'CONSULTAR';
   return undefined;
 }

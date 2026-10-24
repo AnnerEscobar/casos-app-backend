@@ -12,7 +12,7 @@ de JWT validado contra el usuario activo y su sesión persistida.
 Para cada escritura se comparan los datos realmente persistidos antes y después,
 con una entrada por campo. Incluye `estadoInvestigacion: Localizado → Remitido`,
 arrays de seguimientos, asignaciones, revisión, históricos, documentación,
-carátulas, informes, solicitudes de acceso y cambios de usuarios. No introduce
+carátulas, solicitudes de acceso y cambios de usuarios. No introduce
 estados nuevos ni cambia las reglas de seguimiento/cierre. No se reconstruye
 historial anterior a instalar esta funcionalidad.
 
@@ -43,7 +43,7 @@ ocurra en el navegador no equivale a una llamada de logout al servidor.
 
 Un interceptor inicia una transacción por petición POST/PUT/PATCH/DELETE.
 AsyncLocalStorage enlaza el contexto y la sesión con el middleware Mongoose
-instalado en la conexión antes de compilar los ocho modelos auditados. Sus
+instalado en la conexión antes de compilar los siete modelos auditados. Sus
 lecturas comparten snapshot y sus escrituras, el registro del cambio y el evento
 HTTP (cuando no duplica eventos de datos) se confirman juntos con
 `writeConcern: majority`. Login/logout conservan su propio evento. Si falla la auditoría o el

@@ -169,7 +169,7 @@ describe.each(casos)('Históricos: $tipo', ({ tipo, dto, normal, schema, service
     const drive = { uploadFile: jest.fn().mockResolvedValueOnce('https://drive.google.com/uc?id=original').mockResolvedValue('https://drive.google.com/uc?id=seguimiento') };
     const svc: any = new service(Modelo as any, drive as any);
     const file = { originalname: 'expediente.pdf', mimetype: 'application/pdf', buffer: Buffer.from('%PDF-1.4') };
-    const doc = await svc.incorporarHistorico(await validar(dto, { ...minimo, estadoExpedienteHistorico: 'COMPLETO' }), analista, file);
+    const doc = await svc.incorporarHistorico(await validar(dto, { ...minimo, estadoExpedienteHistorico: 'COMPLETO', investigadorOriginal: { nombre: 'Investigador original QA', usuarioId: investigador.userId } }), analista, file);
     const original = [...doc.fileUrls];
     jest.spyOn(Modelo, 'findOne').mockResolvedValue(doc);
     if (tipo === 'alerta') await svc.actualizarCasoConSeguimiento(numero, { nuevoEstado: 'En investigación' }, [{ ...file, originalname: 'lineamiento.pdf' }], investigador);
@@ -236,7 +236,7 @@ describe.each(casos)('Históricos: $tipo', ({ tipo, dto, normal, schema, service
   });
 
   it('pide responsable para el seguimiento histórico antes de subir archivos', async () => {
-    jest.spyOn(Modelo, 'findOne').mockResolvedValue(new Modelo(minimo));
+    jest.spyOn(Modelo, 'findOne').mockResolvedValue(new Modelo({ ...minimo, estadoRegistro: 'Aprobado' }));
     const drive = { uploadFile: jest.fn() };
     const svc: any = new service(Modelo as any, drive as any);
     const resultado = tipo === 'alerta'

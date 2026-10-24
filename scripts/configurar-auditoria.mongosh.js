@@ -18,7 +18,7 @@ bitacora.createIndex({ recursoId: 1, fecha: -1 });
 bitacora.createIndex({ solicitudId: 1 });
 bitacora.createIndex({ 'cambios.campo': 1, fecha: -1 });
 const casos = ['casosalertas', 'casosmaltratos', 'casosconflictos'];
-const otras = ['users', 'documentacioninicials', 'caratulas', 'informes', 'solicitudaccesos'];
+const otras = ['users', 'documentacioninicials', 'caratulas', 'solicitudaccesos'];
 // Usar recursos por colección. Un readWrite sobre toda la base ANULARÍA esta protección.
 const privilegios = [
   ...casos.map(collection => ({ resource: { db: db.getName(), collection }, actions: ['find', 'insert', 'update', 'createIndex', 'listIndexes'] })),

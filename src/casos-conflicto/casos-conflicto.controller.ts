@@ -135,8 +135,8 @@ export class CasosConflictoController {
 
   // Entrega el listado de expedientes de Conflicto obtenido por el servicio.
   @Get()
-  async findAll(): Promise<CasosConflictoDocument[]> {
-    return this.casosConflictoService.findAll();
+  async findAll(@Req() req: any): Promise<CasosConflictoDocument[]> {
+    return this.casosConflictoService.findAll(req.user);
   }
 
   // Consulta los registros de Conflicto correspondientes al investigador autenticado, usando su
@@ -185,9 +185,22 @@ export class CasosConflictoController {
     return this.casosConflictoService.reenviarRegistro(id, req.user.userId, file);
   }
 
-  // ─────────────────────────────────────────────
-  // MÉTODOS TODAVÍA NO IMPLEMENTADOS
-  // ─────────────────────────────────────────────
+  // Consulta el caso aprobado con la misma política de acceso que Búsquedas.
+  @Get('buscar/:numeroDeic')
+  buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string, @Req() req: any) {
+    return this.casosConflictoService.buscarPorNumeroDeic(numeroDeic, req.user);
+  }
+
+  // Exige un PDF real y valida la autorización antes de subirlo o guardar la actuación.
+  @Patch('seguimiento/:numeroDeic')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA, UserRole.INVESTIGADOR)
+  @UseInterceptors(FileInterceptor('file'))
+  agregarSeguimiento(@Param('numeroDeic') numeroDeic: string, @Body() dto: SeguimientoDto,
+    @UploadedFile(new ParseFilePipeBuilder().addFileTypeValidator({ fileType: 'application/pdf' }).build({ fileIsRequired: true })) file: Express.Multer.File,
+    @Req() req: any) {
+    return this.casosConflictoService.agregarSeguimiento(numeroDeic, dto.estadoInvestigacion, file, req.user, dto.investigadorAsignado);
+  }
 
   // Delega en la consulta provisional por ID de Conflicto; todavía devuelve un mensaje de
   // ejemplo.

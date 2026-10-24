@@ -27,7 +27,7 @@ describe.each(casos)('Cierre de $tipo', ({ tipo, schema, service, terminal, camp
     : svc.agregarSeguimiento('DEIC51-2016-05-18-421', estado, { originalname: 'actuacion.pdf' }, usuario);
   beforeEach(() => {
     jest.spyOn(Modelo.db, 'model').mockReturnValue({ exists: jest.fn().mockResolvedValue({ _id: usuario.userId }) } as any);
-    doc = new Modelo({ seguimientos: [] });
+    doc = new Modelo({ estadoRegistro: 'Aprobado', investigadorAsignado: usuario.userId, seguimientos: [] });
     jest.spyOn(Modelo, 'findOne').mockResolvedValue(doc);
     jest.spyOn(doc, 'save').mockResolvedValue(doc);
     jest.spyOn(doc, 'populate').mockResolvedValue(doc);
@@ -53,14 +53,14 @@ describe.each(casos)('Cierre de $tipo', ({ tipo, schema, service, terminal, camp
   });
 
   it('mantiene el cierre al cargar de nuevo un documento', async () => {
-    const persistido = new Modelo({ seguimientos: [{ [campo]: terminal }] }).toObject();
+    const persistido = new Modelo({ investigadorAsignado: usuario.userId, seguimientos: [{ [campo]: terminal }] }).toObject();
     doc = Modelo.hydrate(persistido);
     jest.spyOn(Modelo, 'findOne').mockResolvedValue(doc);
     await expect(crear('Informado')).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('puebla únicamente los nombres del seguimiento en la consulta', async () => {
-    await svc.buscarPorNumeroDeic('DEIC51-2016-05-18-421');
+    await svc.buscarPorNumeroDeic('DEIC51-2016-05-18-421', usuario);
     expect(doc.populate).toHaveBeenCalledWith([
       { path: 'seguimientos.investigadorAsignado', model: 'Usuario', select: 'nombre', strictPopulate: false },
       { path: 'seguimientos.registradoPor', model: 'Usuario', select: 'nombre', strictPopulate: false },

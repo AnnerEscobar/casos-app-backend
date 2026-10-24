@@ -125,8 +125,8 @@ export class CasosMaltratoController {
 
   // Entrega el listado de expedientes de Maltrato obtenido por el servicio.
   @Get()
-  async findAll(): Promise<CasosMaltratoDocument[]> {
-    return this.casosMaltratoService.findAll();
+  async findAll(@Req() req: any): Promise<CasosMaltratoDocument[]> {
+    return this.casosMaltratoService.findAll(req.user);
   }
 
   // Recibe el estado, el responsable y el PDF del seguimiento de Maltrato, y solicita guardarlos
@@ -165,8 +165,8 @@ export class CasosMaltratoController {
 
   // Consulta el expediente de Maltrato identificado por el número DEIC de la petición.
   @Get('buscar/:numeroDeic')
-  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string) {
-    return this.casosMaltratoService.buscarPorNumeroDeic(numeroDeic);
+  async buscarPorNumeroDeic(@Param('numeroDeic') numeroDeic: string, @Req() req: any) {
+    return this.casosMaltratoService.buscarPorNumeroDeic(numeroDeic, req.user);
   }
 
   // Devuelve los expedientes de Maltrato que el analista puede revisar mediante la ruta

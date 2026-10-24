@@ -1,3 +1,4 @@
+import { accesoInstitucional, responsableExpediente } from '../common/acceso-expediente';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,7 +17,7 @@ const id = (v: any): string => String(v?._id ?? v ?? '');
 export const tipoBusqueda = (v: string): string => v?.toLowerCase().includes('alerta') ? 'alerta' : v?.toLowerCase();
 // Determina si el rol tiene acceso institucional a los expedientes: Administrador, Analista o
 // Jefe.
-export const institucional = (u: UsuarioSesion): boolean => [UserRole.ADMIN, UserRole.ANALISTA, UserRole.JEFE].includes(u?.role);
+export const institucional = (u: UsuarioSesion): boolean => accesoInstitucional(u);
 @Injectable()
 export class BusquedaAccesoService {
     // Recibe el modelo de solicitudes de acceso, cuya conexión permite consultar los expedientes y
@@ -35,19 +36,18 @@ export class BusquedaAccesoService {
     private async usuarios(casos: any[]) {
         const ids = new Set<string>();
         for (const c of casos)
-            for (const v of [c.registradoPor, c.revisadoPor, c.investigadorOriginal?.usuarioId, ...(c.historialRevisiones || []).map(r => r.usuario), ...(c.seguimientos || []).flatMap(s => [s.investigadorAsignado, s.registradoPor])]) {
+            for (const v of [c.registradoPor, c.investigadorAsignado, c.revisadoPor, c.investigadorOriginal?.usuarioId, ...(c.historialRevisiones || []).map(r => r.usuario), ...(c.seguimientos || []).flatMap(s => [s.investigadorAsignado, s.registradoPor])]) {
                 if (Types.ObjectId.isValid(id(v)))
                     ids.add(id(v));
             }
         const users = ids.size ? await this.solicitudes.db.model('Usuario').find({ _id: { $in: [...ids] } }).select('_id nombre role').lean().exec() : [];
         return new Map<string, any>(users.map(u => [id(u), u]));
     }
-    // Determina al investigador responsable a partir del origen histórico o del usuario
-    // registrador, sin asignar usuarios que no tengan ese rol.
+    // Resuelve la asignación principal, el responsable histórico o el registrador anterior,
+    // sin presentar como investigador a un usuario con otro rol.
     private responsable(c: any, users: Map<string, any>) {
-        const original = c.origenCaso === 'HISTORICO' ? users.get(id(c.investigadorOriginal?.usuarioId)) : undefined;
-        const registrado = users.get(id(c.registradoPor));
-        const user = original?.role === UserRole.INVESTIGADOR ? original : registrado?.role === UserRole.INVESTIGADOR ? registrado : undefined;
+        const candidato = users.get(id(responsableExpediente(c)));
+        const user = candidato?.role === UserRole.INVESTIGADOR ? candidato : undefined;
         return user ? { _id: id(user), nombre: user.nombre } : null;
     }
     // Calcula el acceso del usuario a cada caso por rol, responsabilidad, seguimiento o permiso.
@@ -222,6 +222,7 @@ export class BusquedaAccesoService {
             const propios = await Promise.all(Object.values(modelos).map(nombre => this.solicitudes.db.model(nombre).find({ $or: [
                 { registradoPor: { $in: variantes(usuario.userId) } },
                 { 'investigadorOriginal.usuarioId': { $in: variantes(usuario.userId) } },
+                { investigadorAsignado: { $in: variantes(usuario.userId) } },
             ] }).select('_id').lean().exec()));
             filtro = { $or: [
                 { solicitante: { $in: variantes(usuario.userId) } },

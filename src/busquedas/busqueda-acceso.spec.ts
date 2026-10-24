@@ -33,6 +33,22 @@ function entorno(tipo = 'Maltrato') {
     };
 }
 describe('Búsquedas: permisos y solicitudes', () => {
+    it('reconoce al asignado del caso aunque el registrador sea analista (QA-004)', async () => {
+        const { service, caso } = entorno();
+        caso.registradoPor = analyst; caso.investigadorAsignado = new Types.ObjectId(owner);
+        const [r] = await service.presentar([caso], sesion(owner), true);
+        expect(r.acceso).toBe('PROPIO');
+        expect(r.investigador._id).toBe(owner);
+    });
+    it('una reasignación principal deja de tratar al registrador como responsable', async () => {
+        const { service, caso, users } = entorno();
+        caso.investigadorAsignado = new Types.ObjectId(other);
+        users.push({ _id: other, nombre: 'Asignado actual', role: UserRole.INVESTIGADOR });
+        const [r] = await service.presentar([caso], sesion(owner), true);
+        expect(r.acceso).toBe('RESTRINGIDO');
+        expect(r.investigador._id).toBe(other);
+        expect(r.victimas).toBeUndefined();
+    });
     describe('bandeja de accesos', () => {
         const solicitud = () => ({ _id: new Types.ObjectId(), tipo: 'maltrato', casoId: caseId,
             numeroDeic: 'DEIC-1', solicitante: { _id: other, nombre: 'Solicitante' },

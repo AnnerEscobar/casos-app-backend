@@ -7,11 +7,9 @@ import { ConfigModule } from '@nestjs/config';
 import { GoogleApiModule } from './google-api/google-api.module';
 import { CasosMaltratoModule } from './casos-maltrato/casos-maltrato.module';
 import { CasosConflictoModule } from './casos-conflicto/casos-conflicto.module';
-import { ProcedimientosModule } from './procedimientos/procedimientos.module';
 import { BusquedasModule } from './busquedas/busquedas.module';
 import { AuthModule } from './auth/auth.module';
 import { CaratulasModule } from './caratulas/caratulas.module';
-import { InformesModule } from './informes/informes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import {
   DocumentacionInicialModule,
@@ -31,11 +29,9 @@ import {
     GoogleApiModule,
     CasosMaltratoModule,
     CasosConflictoModule,
-    ProcedimientosModule,
     BusquedasModule,
     AuthModule,
     CaratulasModule,
-    InformesModule,
     DashboardModule,
     DocumentacionInicialModule,
   ],
