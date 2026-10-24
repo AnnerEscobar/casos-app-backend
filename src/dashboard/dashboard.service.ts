@@ -39,7 +39,7 @@ export class DashboardService {
 
 
   // Construye los indicadores y distribuciones del panel según rol y período, limitando los
-  // datos personales del investigador a sus casos registrados.
+  // datos personales del investigador a los casos bajo su responsabilidad.
   async obtenerDashboard(
     usuario: {
       userId: string;
@@ -51,90 +51,23 @@ export class DashboardService {
       usuario.role === 'Investigador';
 
 
-    /*
-     * =====================================================
-     * FILTRO DE CASOS OFICIALES
-     * =====================================================
-     *
-     * INVESTIGADOR:
-     * Solo casos registrados por él y aprobados.
-     *
-     * ANALISTA / JEFE / ADMINISTRADOR:
-     * Todos los casos aprobados +
-     * históricos que todavía no poseen estadoRegistro.
-     */
-
-    const filtroOficiales: any =
-      esInvestigador
-        ? {
-            registradoPor:
-              new Types.ObjectId(
-                usuario.userId
-              ),
-
-            estadoRegistro:
-              'Aprobado'
-          }
-        : {
-            $or: [
-              {
-                estadoRegistro:
-                  'Aprobado'
-              },
-              {
-                estadoRegistro: {
-                  $exists: false
-                }
-              }
-            ]
-          };
-
-
-    /*
-     * =====================================================
-     * PENDIENTES
-     * =====================================================
-     */
-
-    const filtroPendientes: any =
-      esInvestigador
-        ? {
-            registradoPor:
-              new Types.ObjectId(
-                usuario.userId
-              ),
-
-            estadoRegistro:
-              'Pendiente'
-          }
-        : {
-            estadoRegistro:
-              'Pendiente'
-          };
-
-
-    /*
-     * =====================================================
-     * RECHAZADOS
-     * =====================================================
-     */
-
-    const filtroRechazados: any =
-      esInvestigador
-        ? {
-            registradoPor:
-              new Types.ObjectId(
-                usuario.userId
-              ),
-
-            estadoRegistro:
-              'Rechazado'
-          }
-        : {
-            estadoRegistro:
-              'Rechazado'
-          };
-
+    // La misma responsabilidad que en Mis registros: asignado en el flujo
+    // actual y creador en registros anteriores que no usan ese proceso.
+    const filtro = (proceso: string, estadoRegistro: string): any => {
+      if (!esInvestigador) {
+        return estadoRegistro === 'Aprobado'
+          ? { $or: [{ estadoRegistro }, { estadoRegistro: { $exists: false } }] }
+          : { estadoRegistro };
+      }
+      const investigadorId = new Types.ObjectId(usuario.userId);
+      return {
+        estadoRegistro,
+        $or: [
+          { [proceso]: true, investigadorAsignado: investigadorId },
+          { [proceso]: { $ne: true }, registradoPor: investigadorId },
+        ],
+      };
+    };
 
     /*
      * =====================================================
@@ -162,7 +95,7 @@ export class DashboardService {
       /* CASOS OFICIALES */
 
   this.casosAlertaModel
-  .find(filtroOficiales)
+  .find(filtro('procesoAlerta', 'Aprobado'))
   .populate(
     'registradoPor',
     'nombre role'
@@ -171,7 +104,7 @@ export class DashboardService {
   .exec(),
 
 this.casosMaltratoModel
-  .find(filtroOficiales)
+  .find(filtro('procesoMaltrato', 'Aprobado'))
   .populate(
     'registradoPor',
     'nombre role'
@@ -180,7 +113,7 @@ this.casosMaltratoModel
   .exec(),
 
 this.casosConflictoModel
-  .find(filtroOficiales)
+  .find(filtro('procesoConflicto', 'Aprobado'))
   .populate(
     'registradoPor',
     'nombre role'
@@ -193,17 +126,17 @@ this.casosConflictoModel
 
       this.casosAlertaModel
         .countDocuments(
-          filtroPendientes
+          filtro('procesoAlerta', 'Pendiente')
         ),
 
       this.casosMaltratoModel
         .countDocuments(
-          filtroPendientes
+          filtro('procesoMaltrato', 'Pendiente')
         ),
 
       this.casosConflictoModel
         .countDocuments(
-          filtroPendientes
+          filtro('procesoConflicto', 'Pendiente')
         ),
 
 
@@ -211,17 +144,17 @@ this.casosConflictoModel
 
       this.casosAlertaModel
         .countDocuments(
-          filtroRechazados
+          filtro('procesoAlerta', 'Rechazado')
         ),
 
       this.casosMaltratoModel
         .countDocuments(
-          filtroRechazados
+          filtro('procesoMaltrato', 'Rechazado')
         ),
 
       this.casosConflictoModel
         .countDocuments(
-          filtroRechazados
+          filtro('procesoConflicto', 'Rechazado')
         )
 
     ]);
