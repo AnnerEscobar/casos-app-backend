@@ -1,3 +1,4 @@
+import { ImportacionMasivaDto, LIMITE_ARCHIVO_IMPORTACION } from '../common/importacion-masiva';
 import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
 import { Response } from 'express';
 import { CreateHistoricoMaltratoDto } from './dto/create-historico-maltrato.dto';
@@ -32,6 +33,14 @@ import { RechazarRegistroDto } from '../common/dto/rechazar-registro.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('maltratos')
 export class CasosMaltratoController {
+  @Post('carga-masiva')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: LIMITE_ARCHIVO_IMPORTACION, files: 1, fields: 5 } }))
+  cargaMasiva(@UploadedFile() file: Express.Multer.File, @Body() dto: ImportacionMasivaDto, @Req() req: any) {
+    return this.casosMaltratoService.importarMasivo(file, dto, req.user);
+  }
+
   // Recibe el servicio de Maltrato que valida y ejecuta las operaciones de los expedientes.
   constructor(private readonly casosMaltratoService: CasosMaltratoService) {}
 

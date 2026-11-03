@@ -1,3 +1,4 @@
+import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
 import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
 import { generarExcelConflictos } from './conflicto-excel';
@@ -26,6 +27,10 @@ import { UserRole } from 'src/auth/enums/user-role.enum';
 
 @Injectable()
 export class CasosConflictoService {
+  importarMasivo(file: Express.Multer.File, dto: ImportacionMasivaDto, usuario: UsuarioSesion) {
+    return importarMasivo(this.casoModel, 'conflicto', file, dto, usuario);
+  }
+
   // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
   // Conflicto en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialConflictoDto, usuario: UsuarioSesion) {

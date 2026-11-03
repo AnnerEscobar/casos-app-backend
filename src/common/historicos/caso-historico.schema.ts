@@ -45,6 +45,9 @@ export function configurarCasoHistorico(schema: Schema, camposFlexibles: string[
     },
     fuenteInformacionHistorica: { type: String, enum: Object.values(FuenteInformacionHistorica) },
     observacionHistorica: { type: String, trim: true },
+    // Evidencia de importación oculta en consultas normales. Se conserva el texto de las
+    // columnas de origen, sin convertirlo en instrucciones ni en campos ejecutables.
+    importacionOrigen: { type: Schema.Types.Mixed, select: false },
     anioCaso: { type: Number, min: 1, max: 9999, validate: Number.isInteger },
   });
   // Mongoose admite una función; sus tipos de SchemaType.required solo declaran boolean.

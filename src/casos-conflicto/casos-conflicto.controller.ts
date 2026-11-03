@@ -1,3 +1,4 @@
+import { ImportacionMasivaDto, LIMITE_ARCHIVO_IMPORTACION } from '../common/importacion-masiva';
 import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
 import { Response } from 'express';
 import { CreateHistoricoConflictoDto } from './dto/create-historico-conflicto.dto';
@@ -42,6 +43,14 @@ import { RechazarRegistroDto } from 'src/common/dto/rechazar-registro.dto';
 @UseGuards(JwtAuthGuard)
 @Controller('conflictos')
 export class CasosConflictoController {
+  @Post('carga-masiva')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ANALISTA)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: LIMITE_ARCHIVO_IMPORTACION, files: 1, fields: 5 } }))
+  cargaMasiva(@UploadedFile() file: Express.Multer.File, @Body() dto: ImportacionMasivaDto, @Req() req: any) {
+    return this.casosConflictoService.importarMasivo(file, dto, req.user);
+  }
+
   // Recibe el servicio de Conflicto que valida y ejecuta las operaciones de los expedientes.
   constructor(private readonly casosConflictoService: CasosConflictoService) {}
 

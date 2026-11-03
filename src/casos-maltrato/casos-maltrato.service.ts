@@ -1,3 +1,4 @@
+import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
 import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
 import { generarExcelMaltratos } from './maltrato-excel';
@@ -21,6 +22,10 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosMaltratoService {
+  importarMasivo(file: Express.Multer.File, dto: ImportacionMasivaDto, usuario: UsuarioSesion) {
+    return importarMasivo(this.casoModel, 'maltrato', file, dto, usuario);
+  }
+
   // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
   // Maltrato en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialMaltratoDto, usuario: UsuarioSesion) {

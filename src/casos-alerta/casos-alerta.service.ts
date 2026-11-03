@@ -1,3 +1,4 @@
+import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
 import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
 import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
@@ -20,6 +21,10 @@ import { TipoRevisionRegistro } from 'src/common/enums/tipo-revision-registro.en
 
 @Injectable()
 export class CasosAlertaService {
+  importarMasivo(file: Express.Multer.File, dto: ImportacionMasivaDto, usuario: UsuarioSesion) {
+    return importarMasivo(this.casosAlertaModel, 'alerta', file, dto, usuario);
+  }
+
   // Valida el rol analista y el investigador activo, normaliza el DEIC y abre el expediente de
   // Alerta en preparación, sin PDF de entrega.
   async registrarInicial(dto: RegistroInicialAlertaDto, usuario: UsuarioSesion) {

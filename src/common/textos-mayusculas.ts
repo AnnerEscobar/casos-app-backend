@@ -17,7 +17,7 @@ const internos = new Set([
 function descriptivo(schema: Schema, ruta: string): boolean {
   const partes = ruta.split('.');
   const campo = [...partes].reverse().find(p => !/^\d+$/.test(p)) || '';
-  if (partes.some(p => p === PRESENTACION || p.startsWith('$') || p.startsWith('_'))) return false;
+  if (partes.some(p => p === PRESENTACION || p === 'importacionOrigen' || p.startsWith('$') || p.startsWith('_'))) return false;
   if (internos.has(campo) || /(?:url|urls|email|password|token|hash|fileid|usuarioid|casoid)$/i.test(campo)) return false;
   if (['archivos', 'fileUrls'].some(p => partes.includes(p))) return false;
   // Los identificadores, fechas, horas y coordenadas no son texto descriptivo.
