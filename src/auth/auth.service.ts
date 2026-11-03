@@ -32,7 +32,8 @@ export class AuthService {
   // Busca el correo, comprueba que la cuenta esté activa y compara la contraseña con su hash.
   // Rechaza credenciales inválidas sin iniciar sesión.
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usuarioModel.findOne({ email });
+    if(typeof email!=='string' || typeof password!=='string')throw new UnauthorizedException('Credenciales incorrectas');
+    const user = await this.usuarioModel.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
@@ -131,7 +132,10 @@ export class AuthService {
     const isMatch = await bcrypt.compare(dto.currentPassword, user.password);
     if (!isMatch) throw new BadRequestException('Contraseña actual incorrecta');
 
+    if(dto.newPassword===dto.currentPassword)throw new BadRequestException('Elige una contraseña diferente de la actual.');
+
     user.password = await bcrypt.hash(dto.newPassword, 10);
+    user.debeCambiarPassword = false;
     await user.save();
 
     return { message: 'Contraseña actualizada correctamente' };

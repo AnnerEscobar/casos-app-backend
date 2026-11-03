@@ -1,6 +1,6 @@
 {
   "rootDir": "..",
-  "testRegex": "importacion-masiva.spec.ts$",
+  "testRegex": "(importacion-masiva|investigadores-importacion).spec.ts$",
   "moduleFileExtensions": ["js", "json", "ts"],
   "transform": { "^.+\\.ts$": "ts-jest" },
   "moduleNameMapper": { "^src/(.*)$": "<rootDir>/src/$1" },

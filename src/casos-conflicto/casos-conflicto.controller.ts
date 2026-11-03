@@ -46,7 +46,7 @@ export class CasosConflictoController {
   @Post('carga-masiva')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ANALISTA)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: LIMITE_ARCHIVO_IMPORTACION, files: 1, fields: 5 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: LIMITE_ARCHIVO_IMPORTACION, files: 1, fields: 7 } }))
   cargaMasiva(@UploadedFile() file: Express.Multer.File, @Body() dto: ImportacionMasivaDto, @Req() req: any) {
     return this.casosConflictoService.importarMasivo(file, dto, req.user);
   }

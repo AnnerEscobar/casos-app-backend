@@ -11,6 +11,7 @@ import { incorporarHistorico, UsuarioSesion } from './historicos/caso-historico.
 import { EstadoExpedienteHistorico, FuenteInformacionHistorica, OrigenCaso } from './historicos/caso-historico.schema';
 import { UserRole } from '../auth/enums/user-role.enum';
 import { detectarMapa } from './importacion-masiva-mapeo';
+import { asegurarInvestigador, claveNombre, planificarInvestigadores, CuentaImportacion } from './investigadores-importacion';
 import { FichaAlertaDto } from '../casos-alerta/dto/ficha-alerta.dto';
 import { FichaMaltratoDto } from '../casos-maltrato/dto/ficha-maltrato.dto';
 import { FichaConflictoDto } from '../casos-conflicto/dto/ficha-conflicto.dto';
@@ -19,6 +20,8 @@ export class ImportacionMasivaDto {
   @IsIn(['vista-previa','importar']) accion: string;
   @IsOptional() @IsString() @MaxLength(100) hoja?: string;
   @IsOptional() @Matches(/^[a-f0-9]{64}$/) huella?: string;
+  @IsOptional() @IsIn(['si','no']) crearInvestigadores?: string;
+  @IsOptional() @IsString() @MaxLength(100000) cuentasPropuestas?: string;
   // Un registro en Excel no acredita la existencia del expediente físico.
   @IsIn(['PARCIAL','NO_LOCALIZADO']) estadoExpedienteHistorico: EstadoExpedienteHistorico;
 }
@@ -156,8 +159,7 @@ export async function importarMasivo(model:Model<any>,tipo:TipoCasoNumero,file:E
   if(!dto.hoja)return {hojas};
   const tabla=candidatas.find(t=>t.nombre===dto.hoja);
   if(!tabla)throw new BadRequestException('Selecciona una hoja de datos compatible. Los catálogos y resúmenes no se importan.');
-  const huella=createHash('sha256').update(file.buffer).update(JSON.stringify([tipo,dto.hoja,dto.estadoExpedienteHistorico])).digest('hex');
-  if(dto.accion==='importar' && dto.huella!==huella)throw new ConflictException('El archivo o las opciones cambiaron. Genera otra vista previa.');
+  let huella='';
   const cabeceras=tabla.filas[tabla.inicio].map(String),mapa=detectarMapa(tipo,cabeceras)!;
   const grupos=new Map<string,Grupo>();
   for(let i=tabla.inicio+1;i<tabla.filas.length;i++) {
@@ -181,6 +183,10 @@ export async function importarMasivo(model:Model<any>,tipo:TipoCasoNumero,file:E
     grupos.set(key,grupo);
   }
   if(tabla.filas.length-tabla.inicio-1>MAX_FILAS)throw new BadRequestException('Divide el archivo en lotes de hasta 5,000 filas.');
+  const usuarios=dto.crearInvestigadores==='si'?model.db.model('Usuario'):undefined;
+  const cuentas:CuentaImportacion[]=usuarios?await planificarInvestigadores(usuarios,[...grupos.values()].map(g=>g.datos.investigadorOriginal?.nombre).filter(Boolean),dto.cuentasPropuestas):[];
+  huella=createHash('sha256').update(file.buffer).update(JSON.stringify([tipo,dto.hoja,dto.estadoExpedienteHistorico,dto.crearInvestigadores==='si',cuentas.map(c=>[claveNombre(c.nombre),c.usuario,c.usuarioId||'',c.estado,c.error||''])])).digest('hex');
+  if(dto.accion==='importar' && dto.huella!==huella)throw new ConflictException('El archivo, las opciones o las cuentas cambiaron. Genera otra vista previa.');
   const lock=tipo; // Serializa confirmaciones dentro de este proceso; los índices cubren otros procesos.
   if(dto.accion==='importar' && bloqueos.has(lock))throw new ConflictException('Hay otra carga en curso. Espera a que termine y vuelve a previsualizar.');
   if(dto.accion==='importar')bloqueos.add(lock);
@@ -207,12 +213,20 @@ export async function importarMasivo(model:Model<any>,tipo:TipoCasoNumero,file:E
       const ids:any[]=[{numeroDeic:d.numeroDeic}];
       if(tipo==='alerta'){if(d.numeroMp)ids.push({numeroMp:d.numeroMp});if(d.numeroAlerta)ids.push({numeroAlerta:d.numeroAlerta});}
       if(await model.exists({$or:ids})){g.estado='existente';continue;}
+      const cuenta=cuentas.find(c=>claveNombre(c.nombre)===claveNombre(d.investigadorOriginal?.nombre||''));
+      if(cuenta?.estado==='error'){g.estado='error';g.errores.push(cuenta.error);continue;}
       if(dto.accion==='importar') {
-        try {await incorporarHistorico(model,tipo,d,d,usuario);g.estado='importado';}
+        if(cuenta) {
+          try {d.investigadorOriginal.usuarioId=await asegurarInvestigador(usuarios,cuenta);}
+          catch(e){g.estado='error';g.errores.push(String(mensaje(e)));continue;}
+        }
+        try {
+          await incorporarHistorico(model,tipo,d,d,usuario);g.estado='importado';
+        }
         catch(e){if(e instanceof ConflictException)g.estado='existente';else {g.estado='error';g.errores.push(String(mensaje(e)));}}
       }
     }
     const casos=[...grupos.values()].map(g=>({numeroDeic:g.datos.numeroDeic||'',filas:g.filas,estado:g.estado,errores:[...new Set(g.errores)],victimas:g.datos.victimas?.length||0,infractores:g.datos.infractores?.length||0,nombre:g.datos.nombreDesaparecido||g.datos.victimas?.map((v:any)=>v.nombre).filter(Boolean).join(' / ')||g.datos.infractores?.map((v:any)=>v.nombre).filter(Boolean).join(' / ')||'',investigador:g.datos.investigadorOriginal?.nombre||''}));
-    return {hojas,hoja:dto.hoja,huella,casos,columnasSinMapear:mapa.noMapeadas,resumen:{filas:casos.reduce((n,c)=>n+c.filas.length,0),casos:casos.length,listos:casos.filter(c=>c.estado==='listo').length,importados:casos.filter(c=>c.estado==='importado').length,existentes:casos.filter(c=>c.estado==='existente').length,errores:casos.filter(c=>c.estado==='error').length}};
+    return {hojas,hoja:dto.hoja,huella,casos,cuentas,columnasSinMapear:mapa.noMapeadas,resumen:{filas:casos.reduce((n,c)=>n+c.filas.length,0),casos:casos.length,listos:casos.filter(c=>c.estado==='listo').length,importados:casos.filter(c=>c.estado==='importado').length,existentes:casos.filter(c=>c.estado==='existente').length,errores:casos.filter(c=>c.estado==='error').length}};
   } finally {if(dto.accion==='importar')bloqueos.delete(lock);}
 }

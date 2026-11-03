@@ -18,6 +18,9 @@ export class Usuario {
   @Prop({ required: true })
   password: string;
 
+  @Prop({ default: false })
+  debeCambiarPassword?: boolean;
+
   @Prop()
   token?: string;
 

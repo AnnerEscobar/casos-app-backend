@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
@@ -52,12 +52,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
   await this.sesiones.validar(user);
 
+  // La obligación se consulta en la base en cada petición, no en un JWT que pueda quedar viejo.
+  const ruta=(req.originalUrl || req.url || '').split('?')[0].replace(/\/+$/,'');
+  const permitidas=new Set(['GET /auth/session','POST /auth/logout','POST /auth/actividad','PATCH /auth/change-password']);
+  if(user.debeCambiarPassword && !permitidas.has(`${req.method} ${ruta}`))throw new ForbiddenException({code:'CAMBIO_PASSWORD_REQUERIDO',message:'Debes cambiar la contraseña temporal antes de utilizar el sistema.'});
+
   // Retornar solo los datos que necesitas
   return {
     userId: user._id,
     nombre: user.nombre,
     email: user.email,
     role: user.role,
+    debeCambiarPassword: !!user.debeCambiarPassword,
     exp: payload.exp,
     sesionId: user.sesionId,
     expiresAt: new Date(user.sesionExpira).getTime(),

@@ -65,6 +65,22 @@ it('lee texto con comillas, saltos de línea, vacíos y UTF-8 y no interpreta f�
   expect(()=>leerTexto('A;B\n"sin cierre')).toThrow();
   expect(fechaImportada(46023)).toBe('2026-01-01');expect(fechaImportada('03/04/2026')).toBe('2026-04-03');expect(()=>fechaImportada('31/02/2026')).toThrow();
 });
+it('crea una cuenta para varios casos solo al confirmar y vincula al investigador original',async()=>{
+  const query=(v:any)=>({select:()=>({lean:()=>({exec:async()=>v})})});
+  const persona={_id:'507f1f77bcf86cd799439012',nombre:'Anner Escobar',email:'anner.escobar',role:UserRole.INVESTIGADOR,activo:true};
+  const usuarios:any={find:()=>query([]),findOne:()=>query(persona),exists:jest.fn().mockResolvedValue({_id:persona._id}),create:jest.fn().mockResolvedValue(persona)};
+  jest.spyOn(models.maltrato.db,'model').mockReturnValue(usuarios);
+  const guardados:any[]=[];
+  jest.spyOn(models.maltrato.prototype,'save').mockImplementation(async function(){guardados.push(this);return this;});
+  jest.spyOn(models.maltrato.prototype,'populate').mockImplementation(async function(){return this;});
+  const a=fila('VICTIMA A'),b=fila('VICTIMA B');a[8]='Anner Escobar';b[8]='Anner Escobar';b[4]='DEIC51-2026-01-01-2';
+  const file=await libro([a,b]),dto={...options,crearInvestigadores:'si'};
+  const preview:any=await importarMasivo(models.maltrato,'maltrato',file,dto,usuario);
+  expect(usuarios.create).not.toHaveBeenCalled();expect(preview.cuentas[0].usuario).toBe('anner.escobar');
+  const resultado:any=await importarMasivo(models.maltrato,'maltrato',file,{...dto,accion:'importar',huella:preview.huella},usuario);
+  expect(resultado.resumen.importados).toBe(2);expect(usuarios.create).toHaveBeenCalledTimes(1);
+  for(const c of guardados){expect(String(c.investigadorOriginal.usuarioId)).toBe(persona._id);expect(c.investigadorAsignado).toBeUndefined();}
+});
 it('lee columnas reordenadas y rechaza DEIC de otro tipo',async()=>{
   const headers=['CASO INTERNO',maltratoHeaders[12],'EDAD'];
   const r:any=await importarMasivo(models.maltrato,'maltrato',await libro([['DEIC51-2026-01-01-2','PRUEBA',0]],headers),options,usuario);expect(r.resumen.listos).toBe(1);
