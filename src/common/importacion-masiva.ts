@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException } from '@nestjs/common';
-import { Workbook } from 'exceljs';
+import { stream as excelStream } from 'exceljs';
+import { PassThrough, Readable } from 'stream';
+import JSZip = require('jszip');
 import { createHash } from 'crypto';
 import { Model } from 'mongoose';
 import { plainToInstance } from 'class-transformer';
@@ -74,6 +76,7 @@ function validarZip(buffer: Buffer) {
     if(total>40*1024*1024)throw new BadRequestException('El contenido descomprimido del Excel supera 40 MB.');
     posicion+=46+buffer.readUInt16LE(posicion+28)+buffer.readUInt16LE(posicion+30)+buffer.readUInt16LE(posicion+32);
   }
+  return total;
 }
 async function tablasArchivo(file: Express.Multer.File): Promise<Tabla[]> {
   if(!file?.buffer?.length)throw new BadRequestException('Selecciona un archivo.');
@@ -86,14 +89,39 @@ async function tablasArchivo(file: Express.Multer.File): Promise<Tabla[]> {
   }
   if(extension!=='xlsx')throw new BadRequestException('Usa XLSX, CSV, TSV o TXT tabulado; convierte los XLS antiguos a XLSX.');
   validarZip(file.buffer);
-  const wb=new Workbook();
-  try {await wb.xlsx.load(file.buffer as any);}catch {throw new BadRequestException('No se pudo leer el Excel. Verifica que sea XLSX y no esté protegido.');}
-  return wb.worksheets.map(s=>{
-    if(s.rowCount>MAX_FILAS+30 || s.columnCount>MAX_COLUMNAS) return {nombre:s.name,filas:[]};
-    const filas:any[][]=[];
-    s.eachRow({includeEmpty:true},row=>filas.push(Array.from({length:s.columnCount},(_,i)=>valorCelda(row.getCell(i+1).value))));
-    return {nombre:s.name,filas,date1904:!!wb.properties.date1904};
+  // ExcelJS necesita los metadatos y textos compartidos antes de leer las hojas.
+  // Reordenar las entradas comprimidas evita expandir el libro completo y permite
+  // procesar también archivos exportados con workbook.xml al final del ZIP.
+  const zip=await JSZip.loadAsync(file.buffer);
+  const prioridad=(nombre:string)=>nombre==='xl/workbook.xml'?0:nombre==='xl/_rels/workbook.xml.rels'?1:nombre==='xl/sharedStrings.xml'?2:3;
+  zip.files=Object.fromEntries(Object.entries(zip.files).sort(([a],[b])=>prioridad(a)-prioridad(b)));
+  const entrada=new PassThrough();
+  const archivoOrdenado=zip.generateNodeStream({streamFiles:true,compression:'DEFLATE'}) as Readable;
+  archivoOrdenado.on('error',error=>entrada.destroy(error));
+  archivoOrdenado.pipe(entrada);
+  const lector=new excelStream.xlsx.WorkbookReader(entrada, {
+    worksheets:'emit',sharedStrings:'cache',styles:'ignore',hyperlinks:'ignore',entries:'ignore',
   });
+  const tablas:Tabla[]=[];
+  try {
+    for await (const hoja of lector) {
+      const filas:any[][]=[];
+      for await (const row of hoja) {
+        if(row.number>MAX_FILAS+30 || row.cellCount>MAX_COLUMNAS)
+          throw new BadRequestException('El Excel supera 5,000 filas o 250 columnas. Divide la base y elimina las filas y columnas vacías sobrantes.');
+        // Respeta las posiciones originales para que el reporte identifique la fila del Excel.
+        while(filas.length<row.number-1)filas.push([]);
+        filas.push(Array.from({length:row.cellCount},(_,i)=>valorCelda(row.getCell(i+1).value)));
+      }
+      tablas.push({nombre:(hoja as any).name,filas,date1904:!!(lector as any).model?.properties?.date1904});
+    }
+    return tablas;
+  } catch(error) {
+    if(error instanceof BadRequestException)throw error;
+    throw new BadRequestException('No se pudo leer el Excel. Verifica que sea XLSX y no esté protegido.');
+  } finally {
+    archivoOrdenado.destroy();entrada.destroy();
+  }
 }
 export function fechaImportada(value: any, date1904=false): string {
   let d: Date;

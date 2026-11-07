@@ -97,6 +97,25 @@ it('vincula cuentas existentes por nombre sin activar creación de investigadore
   expect(resultado.resumen.importados).toBe(2);expect(usuarios.create).not.toHaveBeenCalled();
   for(const c of guardados){expect(String(c.investigadorOriginal.usuarioId)).toBe(persona._id);expect(c.investigadorAsignado).toBeUndefined();}
 });
+it('lee sin cargar estilos masivos y conserva números de fila y fechas del calendario 1904',async()=>{
+  const wb=new Workbook();wb.properties.date1904=true;
+  const sh=wb.addWorksheet('Datos');sh.addRow(maltratoHeaders);sh.addRow([]);
+  const datos=fila();datos[6]=new Date('2026-01-01Z');sh.addRow(datos);
+  // Las filas vacías con formato no son casos; los estilos no participan en la importación.
+  for(let i=4;i<1200;i++)sh.getCell(i,1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEEEEEE'}};
+  let guardado:any;
+  jest.spyOn(models.maltrato.prototype,'save').mockImplementation(async function(){guardado=this;return this;});
+  jest.spyOn(models.maltrato.prototype,'populate').mockImplementation(async function(){return this;});
+  const file=archivo(Buffer.from(await wb.xlsx.writeBuffer()));
+  const preview:any=await importarMasivo(models.maltrato,'maltrato',file,options,usuario);
+  expect(preview.resumen).toMatchObject({casos:1,listos:1});expect(preview.casos[0].filas).toEqual([3]);
+  await importarMasivo(models.maltrato,'maltrato',file,{...options,accion:'importar',huella:preview.huella},usuario);
+  expect(guardado.fechaIngreso.toISOString().slice(0,10)).toBe('2026-01-01');
+},30000);
+it('rechaza filas fuera del límite antes de acumular la hoja completa',async()=>{
+  const wb=new Workbook();const sh=wb.addWorksheet('Datos');sh.addRow(maltratoHeaders);sh.getCell(5031,1).value='Fuera de límite';
+  await expect(importarMasivo(models.maltrato,'maltrato',archivo(Buffer.from(await wb.xlsx.writeBuffer())),options,usuario)).rejects.toMatchObject({status:400});
+},30000);
 it('lee columnas reordenadas y rechaza DEIC de otro tipo',async()=>{
   const headers=['CASO INTERNO',maltratoHeaders[12],'EDAD'];
   const r:any=await importarMasivo(models.maltrato,'maltrato',await libro([['DEIC51-2026-01-01-2','PRUEBA',0]],headers),options,usuario);expect(r.resumen.listos).toBe(1);
@@ -119,6 +138,8 @@ const fuentes=[
   ['conflicto','F:/SERVIDOR/BASES 2026/3. BDD CONFLICTO/DEIC53-2026.xlsx'],
 ] as const;
 for(const [tipo,path] of fuentes)(existsSync(path)?it:it.skip)(`revisa el Excel real de ${tipo} sin persistir ni mostrar datos personales`,async()=>{
+  const consultaUsuarios={find:()=>({select:()=>({lean:()=>({exec:async()=>[]})})})};
+  jest.spyOn(models[tipo].db,'model').mockReturnValue(consultaUsuarios as any);
   const file=archivo(readFileSync(path));
   const listado:any=await importarMasivo(models[tipo],tipo,file,{...options,hoja:undefined},usuario);
   expect(listado.hojas.length).toBeGreaterThan(0);
