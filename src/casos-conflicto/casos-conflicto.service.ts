@@ -1,5 +1,5 @@
 import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
-import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
+import { filtroResponsableExpediente, filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialConflictoDto, CompletarConflictoDto } from './dto/gestion-conflicto.dto';
 import { generarExcelConflictos } from './conflicto-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
@@ -548,7 +548,7 @@ async findMisRegistros(
   const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casoModel
     .find({
 
-      $or:[{procesoConflicto:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoConflicto:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
+      ...filtroResponsableExpediente(investigadorId),
 
       estadoRegistro,
 

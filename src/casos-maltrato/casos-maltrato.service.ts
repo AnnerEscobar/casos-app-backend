@@ -1,5 +1,5 @@
 import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
-import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
+import { filtroResponsableExpediente, filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { RegistroInicialMaltratoDto, CompletarMaltratoDto } from './dto/gestion-maltrato.dto';
 import { generarExcelMaltratos } from './maltrato-excel';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
@@ -549,7 +549,7 @@ export class CasosMaltratoService {
 
     const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casoModel
       .find({
-        $or:[{procesoMaltrato:true,investigadorAsignado:new Types.ObjectId(investigadorId)},{procesoMaltrato:{$ne:true},registradoPor:new Types.ObjectId(investigadorId)}],
+        ...filtroResponsableExpediente(investigadorId),
 
         estadoRegistro,
       })

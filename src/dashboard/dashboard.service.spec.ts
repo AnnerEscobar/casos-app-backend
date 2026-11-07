@@ -50,6 +50,18 @@ describe('Dashboard por responsable del expediente', () => {
     expect(resultado.autorizaciones.rechazados).toEqual({ total: 6, alertas: 2, maltratos: 2, conflictos: 2 });
   });
 
+  it('muestra históricos del investigador aunque los haya cargado el analista', async () => {
+    const documentos = [
+      { estadoRegistro: 'Aprobado', origenCaso: 'HISTORICO', registradoPor: analista, investigadorOriginal: { usuarioId: investigador } },
+      { estadoRegistro: 'Aprobado', origenCaso: 'HISTORICO', registradoPor: investigador, investigadorOriginal: { usuarioId: otro } },
+      { estadoRegistro: 'Aprobado', origenCaso: 'HISTORICO', registradoPor: analista, investigadorOriginal: { usuarioId: investigador }, investigadorAsignado: otro },
+    ];
+    const m = modelo(documentos);
+    const resultado = await new DashboardService(m as any, m as any, m as any).obtenerDashboard({ userId: String(investigador), role: 'Investigador' });
+    expect(resultado.alertas).toEqual([documentos[0]]);
+    expect(resultado.resumen.totalCasos).toBe(3);
+  });
+
   it('otro investigador recibe solo sus casos y nunca los asignados al primero', async () => {
     const resultado = await preparar().obtenerDashboard({ userId: String(otro), role: 'Investigador' });
     for (const casos of [resultado.alertas, resultado.maltratos, resultado.conflictos]) {

@@ -1,3 +1,4 @@
+import { filtroResponsableExpediente } from '../common/acceso-expediente';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -62,10 +63,7 @@ export class DashboardService {
       const investigadorId = new Types.ObjectId(usuario.userId);
       return {
         estadoRegistro,
-        $or: [
-          { [proceso]: true, investigadorAsignado: investigadorId },
-          { [proceso]: { $ne: true }, registradoPor: investigadorId },
-        ],
+        ...filtroResponsableExpediente(investigadorId),
       };
     };
 

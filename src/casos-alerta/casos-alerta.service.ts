@@ -1,5 +1,5 @@
 import { importarMasivo, ImportacionMasivaDto } from '../common/importacion-masiva';
-import { filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
+import { filtroResponsableExpediente, filtrarAccesoExpedientes, exigirConsultaExpediente, exigirSeguimientoExpediente } from '../common/acceso-expediente';
 import { validarSeguimientoAbierto, guardarSeguimiento, poblarUsuariosSeguimientos } from '../common/seguimiento-terminal';
 import { CreateHistoricoAlertaDto } from './dto/create-historico-alerta.dto';
 import { incorporarHistorico, auditoriaSeguimiento, validarResponsableHistorico, UsuarioSesion } from '../common/historicos/caso-historico.service';
@@ -611,10 +611,7 @@ export class CasosAlertaService {
 
     const consultar = (estadoRegistro: EstadoRegistro | { $in: EstadoRegistro[] }) => this.casosAlertaModel
       .find({
-        $or: [
-          { procesoAlerta: true, investigadorAsignado: new Types.ObjectId(investigadorId) },
-          { procesoAlerta: { $ne: true }, registradoPor: new Types.ObjectId(investigadorId) },
-        ],
+        ...filtroResponsableExpediente(investigadorId),
 
         estadoRegistro,
       })

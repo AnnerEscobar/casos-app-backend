@@ -57,3 +57,17 @@ export function exigirSeguimientoExpediente(caso: any, usuario: UsuarioSesion): 
   if (caso.expedienteEnPreparacion || (caso.estadoRegistro && caso.estadoRegistro !== 'Aprobado'))
     throw new ConflictException('El expediente debe estar aprobado antes de agregar seguimientos.');
 }
+
+// Equivale a responsableExpediente en consultas Mongo; conserva la prioridad de asignación.
+export function filtroResponsableExpediente(investigadorId: string | Types.ObjectId): any {
+  const id = new Types.ObjectId(String(investigadorId));
+  const sinAsignado = { investigadorAsignado: null };
+  return { $or: [
+    { investigadorAsignado: id },
+    { ...sinAsignado, origenCaso: 'HISTORICO', 'investigadorOriginal.usuarioId': id },
+    { ...sinAsignado, registradoPor: id, $nor: [{ procesoAlerta: true }, { procesoMaltrato: true }, { procesoConflicto: true }], $or: [
+      { origenCaso: { $ne: 'HISTORICO' } },
+      { 'investigadorOriginal.usuarioId': null },
+    ] },
+  ] };
+}

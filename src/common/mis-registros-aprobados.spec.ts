@@ -1,3 +1,4 @@
+import { filtroResponsableExpediente } from './acceso-expediente';
 import { Types } from 'mongoose';
 import { CasosAlertaService } from '../casos-alerta/casos-alerta.service';
 import { CasosMaltratoService } from '../casos-maltrato/casos-maltrato.service';
@@ -41,10 +42,7 @@ describe.each(variantes)('Mis registros y aprobados recientes: $nombre', ({ proc
 
   it('restringe ambos grupos al asignado actual o al registrador del proceso anterior', async () => {
     await service.findMisRegistros(String(investigador));
-    const propiedad = [
-      { [proceso]: true, investigadorAsignado: investigador },
-      { [proceso]: { $ne: true }, registradoPor: investigador },
-    ];
+    const propiedad = filtroResponsableExpediente(investigador).$or;
     expect(modelo.find).toHaveBeenNthCalledWith(1, {
       $or: propiedad,
       estadoRegistro: { $in: [EstadoRegistro.PENDIENTE, EstadoRegistro.RECHAZADO] },

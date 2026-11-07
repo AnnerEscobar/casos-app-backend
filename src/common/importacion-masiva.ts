@@ -183,8 +183,9 @@ export async function importarMasivo(model:Model<any>,tipo:TipoCasoNumero,file:E
     grupos.set(key,grupo);
   }
   if(tabla.filas.length-tabla.inicio-1>MAX_FILAS)throw new BadRequestException('Divide el archivo en lotes de hasta 5,000 filas.');
-  const usuarios=dto.crearInvestigadores==='si'?model.db.model('Usuario'):undefined;
-  const cuentas:CuentaImportacion[]=usuarios?await planificarInvestigadores(usuarios,[...grupos.values()].map(g=>g.datos.investigadorOriginal?.nombre).filter(Boolean),dto.cuentasPropuestas):[];
+  const nombresInvestigadores=[...grupos.values()].map(g=>g.datos.investigadorOriginal?.nombre).filter(Boolean);
+  const usuarios=nombresInvestigadores.length?model.db.model('Usuario'):undefined;
+  const cuentas:CuentaImportacion[]=usuarios?await planificarInvestigadores(usuarios,nombresInvestigadores,dto.cuentasPropuestas):[];
   huella=createHash('sha256').update(file.buffer).update(JSON.stringify([tipo,dto.hoja,dto.estadoExpedienteHistorico,dto.crearInvestigadores==='si',cuentas.map(c=>[claveNombre(c.nombre),c.usuario,c.usuarioId||'',c.estado,c.error||''])])).digest('hex');
   if(dto.accion==='importar' && dto.huella!==huella)throw new ConflictException('El archivo, las opciones o las cuentas cambiaron. Genera otra vista previa.');
   const lock=tipo; // Serializa confirmaciones dentro de este proceso; los índices cubren otros procesos.
@@ -214,6 +215,7 @@ export async function importarMasivo(model:Model<any>,tipo:TipoCasoNumero,file:E
       if(tipo==='alerta'){if(d.numeroMp)ids.push({numeroMp:d.numeroMp});if(d.numeroAlerta)ids.push({numeroAlerta:d.numeroAlerta});}
       if(await model.exists({$or:ids})){g.estado='existente';continue;}
       const cuenta=cuentas.find(c=>claveNombre(c.nombre)===claveNombre(d.investigadorOriginal?.nombre||''));
+      if(cuenta?.estado==='nuevo' && dto.crearInvestigadores!=='si'){g.estado='error';g.errores.push('No se encontró una cuenta para el investigador. Revisa el nombre o activa la creación de investigadores.');continue;}
       if(cuenta?.estado==='error'){g.estado='error';g.errores.push(cuenta.error);continue;}
       if(dto.accion==='importar') {
         if(cuenta) {
